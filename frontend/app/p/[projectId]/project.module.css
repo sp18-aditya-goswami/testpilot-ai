@@ -1,0 +1,62 @@
+/* Hallmark · module: project · system and stamp in app/globals.css */
+
+.frame { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: calc(100dvh - var(--bar-height)); }
+.side { position: sticky; top: var(--bar-height); height: calc(100dvh - var(--bar-height)); min-width: 0; }
+.main { min-width: 0; padding: var(--space-xl) var(--space-xl) var(--space-3xl); }
+.content { max-width: 1180px; }
+.disclosure { display: none; margin-bottom: var(--space-md); }
+
+@media (max-width: 60rem) {
+  .frame { grid-template-columns: minmax(0, 1fr); }
+  .side { display: none; position: static; height: auto; max-height: 70dvh; border-bottom: var(--rule-hair) solid var(--color-rule); }
+  .sideOpen { display: block; }
+  .main { padding: var(--space-md) var(--gutter) var(--space-2xl); }
+  .disclosure { display: inline-flex; }
+}
+
+/* shared by the overview, environments and run history pages */
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; margin-bottom: var(--space-xl); }
+.head h1 { font-size: var(--text-3xl); line-height: 1.08; max-width: 28ch; text-wrap: balance; }
+.head p { margin-top: var(--space-xs); max-width: 62ch; color: var(--color-ink-2); }
+.figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: var(--rule-hair) solid var(--color-rule); border-bottom: var(--rule-hair) solid var(--color-rule); margin-bottom: var(--space-2xl); }
+.figure { display: grid; gap: var(--space-2xs); padding: var(--space-md) var(--space-lg); border-left: var(--rule-hair) solid var(--color-rule); }
+.figure:first-child { border-left: 0; padding-left: 0; }
+.figure :global(.figure) { font-size: var(--text-3xl); }
+.figureLabel { font-size: var(--text-sm); color: var(--color-muted); }
+.sectionHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-md); flex-wrap: wrap; }
+.sectionHead a { font-size: var(--text-sm); color: var(--color-ink-2); text-decoration: none; }
+@media (hover: hover) { .sectionHead a:hover { color: var(--color-ink); text-decoration: underline; text-decoration-color: var(--color-accent); } }
+.sectionHead a:active { color: var(--color-ink); }
+.block { margin-bottom: var(--space-2xl); }
+.tablePanel { overflow: hidden; }
+.tablePanel :global(.ledger) td, .tablePanel :global(.ledger) th { padding-inline: var(--space-md); }
+.tablePanel :global(.ledger) tbody tr:last-child td { border-bottom: 0; }
+.runSource { display: grid; gap: var(--space-3xs); }
+.runSource a { color: var(--color-ink); text-decoration: none; font-weight: 400; }
+@media (hover: hover) { .runSource a:hover { text-decoration: underline; text-decoration-color: var(--color-accent); } }
+.runSource a:active { color: var(--color-ink-2); }
+.runKind { font-size: var(--text-xs); color: var(--color-muted); }
+.barCell { min-width: 12rem; }
+.barCell > div { max-width: 10rem; }
+.counts { display: flex; gap: var(--space-sm); margin-top: var(--space-2xs); font-size: var(--text-xs); white-space: nowrap; }
+.passed { color: var(--color-success); }
+.failed { color: var(--color-error); }
+.clean { color: var(--color-muted); }
+.danger { margin-top: var(--space-3xl); padding-top: var(--space-lg); border-top: var(--rule-hair) solid var(--color-rule); display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; }
+.danger h2 { font-size: var(--text-lg); text-wrap: balance; }
+.danger p { font-size: var(--text-sm); color: var(--color-muted); margin-top: var(--space-2xs); }
+.dangerKey { color: var(--color-error); box-shadow: inset 0 0 0 var(--rule-hair) var(--color-error); }
+@media (hover: hover) { .dangerKey:hover:not(:disabled) { background: var(--color-error-wash); box-shadow: inset 0 0 0 var(--rule-hair) var(--color-error); } }
+.dangerKey:active:not(:disabled) { background: var(--color-error-wash); }
+.editForm { display: grid; gap: var(--space-md); max-width: 40rem; margin-bottom: var(--space-xl); }
+.formActions { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+.skeletonBlock { display: grid; gap: var(--space-sm); }
+.skeletonBlock :global(.skeleton) { height: 22px; }
+.skeletonBlock :global(.skeleton):first-child { height: 40px; max-width: 24rem; }
+
+@media (max-width: 40rem) {
+  .figures { grid-template-columns: minmax(0, 1fr); }
+  .figure { border-left: 0; padding-left: 0; border-top: var(--rule-hair) solid var(--color-rule); }
+  .figure:first-child { border-top: 0; }
+  .head h1 { font-size: var(--text-2xl); }
+}

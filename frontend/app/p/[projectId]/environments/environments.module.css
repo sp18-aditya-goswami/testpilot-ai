@@ -1,0 +1,32 @@
+/* Hallmark · module: environments · system and stamp in app/globals.css */
+
+.list { display: grid; gap: var(--space-md); }
+.env { padding: var(--space-lg); display: grid; gap: var(--space-sm); }
+.envHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; }
+.envHead h2 { font-size: var(--text-lg); font-weight: 400; text-wrap: balance; }
+.envMeta { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-lg); font-size: var(--text-sm); color: var(--color-ink-2); }
+.defaultWord { font-size: var(--text-sm); color: var(--color-ink-2); margin-left: var(--space-xs); font-weight: 300; }
+.envActions { display: flex; gap: var(--space-2xs); }
+.warn { display: flex; gap: var(--space-2xs); align-items: flex-start; font-size: var(--text-sm); color: var(--color-warn); }
+.warn svg { flex-shrink: 0; margin-top: var(--space-2xs); }
+.varList { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-md); font-size: var(--text-sm); color: var(--color-muted); }
+.newWrap { margin-bottom: var(--space-xl); }
+
+.form { display: grid; gap: var(--space-md); }
+.formGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--space-md); }
+.vars { display: grid; gap: var(--space-sm); margin: 0; padding: 0; border: 0; min-width: 0; }
+.vars legend { padding: 0; margin-bottom: var(--space-2xs); font-size: var(--text-sm); color: var(--color-ink); }
+.varTable td { padding: var(--space-2xs) var(--space-xs); vertical-align: middle; }
+.varTable th { padding-inline: var(--space-xs); }
+.cellInput { min-height: 34px; min-width: 10rem; }
+.stored { display: inline-flex; align-items: center; gap: var(--space-xs); min-height: 34px; }
+.remove { position: relative; display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-card); background: transparent; color: var(--color-muted); cursor: pointer; }
+.remove::before { content: ""; position: absolute; inset: -7px; }
+@media (hover: hover) { .remove:hover { color: var(--color-error); background: var(--color-paper-3); } }
+.remove:active { color: var(--color-error); }
+.remove:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; }
+.actions { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+
+@media (max-width: 40rem) {
+  .formGrid { grid-template-columns: minmax(0, 1fr); }
+}

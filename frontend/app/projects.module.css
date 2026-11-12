@@ -1,0 +1,27 @@
+/* Hallmark · module: projects · system and stamp in app/globals.css */
+
+.form { display: grid; gap: var(--space-md); max-width: 40rem; padding: var(--space-lg); margin-bottom: var(--space-xl); }
+.form h2 { font-size: var(--text-xl); text-wrap: balance; }
+.actions { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+
+.list { list-style: none; margin: 0; padding: 0; overflow: hidden; }
+.list li + li { border-top: var(--rule-hair) solid var(--color-rule); }
+.project { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-lg); padding: var(--space-md) var(--space-lg); color: var(--color-ink-2); text-decoration: none; transition: background-color var(--dur-micro) var(--ease-out); }
+.project > svg { color: var(--color-muted); flex-shrink: 0; }
+@media (hover: hover) { .project:hover { background: var(--color-paper-3); } .project:hover > svg { color: var(--color-ink); } }
+.project:active { background: var(--color-paper-3); }
+.project:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.name { display: grid; gap: var(--space-3xs); min-width: 0; }
+.title { font-size: var(--text-lg); font-weight: 400; color: var(--color-ink); }
+.desc { font-size: var(--text-sm); color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2xs) var(--space-lg); font-size: var(--text-sm); color: var(--color-muted); }
+.stats b { font-weight: 400; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+.last { color: var(--color-ink-2); }
+.empty { max-width: 44rem; }
+.skeleton { display: grid; gap: var(--space-sm); }
+.skeleton :global(.skeleton) { height: 64px; }
+
+@media (max-width: 40rem) {
+  .project { grid-template-columns: minmax(0, 1fr) auto; }
+  .stats { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+}

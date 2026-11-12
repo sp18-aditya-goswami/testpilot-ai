@@ -1,0 +1,9 @@
+.venv
+.env
+data
+frontend
+.hallmark
+**/__pycache__
+.pytest_cache
+.hypothesis
+*.db

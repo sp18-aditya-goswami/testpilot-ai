@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+PyYAML
+httpx
+anthropic[bedrock]
+openai
+jsonschema
+sqlalchemy
+jinja2
+python-dotenv
+pytest
+schemathesis

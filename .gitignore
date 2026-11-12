@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+*.db
+data/
+node_modules/
+.next/
+.hallmark/
+.DS_Store
+.pytest_cache/
+.hypothesis/
+*.tsbuildinfo

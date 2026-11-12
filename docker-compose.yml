@@ -1,0 +1,40 @@
+# One shared TestPilot for a team: `docker compose up -d --build`, then open http://<host>:3000.
+# Only the frontend is published; the backend is reachable from it alone.
+# There is no login yet: run this on a trusted network or behind your VPN.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      TESTPILOT_ALLOWED_HOSTS: ${TESTPILOT_ALLOWED_HOSTS:-localhost,127.0.0.1,demo-api,host.docker.internal}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - testpilot-data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        TESTPILOT_BACKEND_URL: http://backend:8001
+    ports:
+      - "${TESTPILOT_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  demo-api:
+    profiles: ["demo"]
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["uvicorn", "demo_api.main:app", "--host", "0.0.0.0", "--port", "8008"]
+    environment:
+      DEMO_API_LATENCY_MS: ${DEMO_API_LATENCY_MS:-0}
+      DEMO_API_DB: /app/data/demo.db
+
+volumes:
+  testpilot-data:
