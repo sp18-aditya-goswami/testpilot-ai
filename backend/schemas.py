@@ -35,6 +35,7 @@ class Endpoint(BaseModel):
     parameters: list[Parameter] = []
     request_body_schema: dict[str, Any] | None = None
     request_body_required: bool = False
+    request_body_media: str | None = None
     responses: dict[str, dict[str, Any] | None] = {}
     requires_auth: bool = False
 
@@ -47,6 +48,7 @@ class ApiSummary(BaseModel):
     openapi_version: str
     server_url: str | None = None
     endpoints: list[Endpoint]
+    security_schemes: dict[str, Any] = {}  # as declared in the spec, by name
 
 
 # ---------- Test plan ----------
@@ -140,6 +142,20 @@ class Analysis(BaseModel):
     likely_cause: str
     investigation_steps: list[str] = []
     source: Literal["ai", "rules"] = "rules"
+    cause_group: str = ""  # failures with the same root cause share this label
+
+
+class Fix(BaseModel):
+    """How to make a failed case pass, suggested by AI on request and kept on the run."""
+
+    fault: Literal["api", "test", "spec"]
+    fault_reason: str
+    steps: list[str] = []
+    code_language: str = ""
+    code_caption: str = ""
+    code: str = ""
+    spec_change: str = ""
+    confirm: str = ""
 
 
 class CaseResult(BaseModel):
@@ -151,6 +167,7 @@ class CaseResult(BaseModel):
     analysis: Analysis | None = None
     regression_test: str | None = None
     note: str = ""
+    fix: Fix | None = None
 
 
 class RunCounts(BaseModel):
@@ -181,6 +198,8 @@ class Run(BaseModel):
     counts: RunCounts = RunCounts()
     request_count: int = 0
     message: str = ""
+    auth_note: str = ""  # how the run signed in, or why it could not
+    auth_exchanges: list[Exchange] = []  # the sign-in requests, secrets redacted
     fuzz_status: Literal["off", "running", "ok", "error"] = "off"
     fuzz_message: str = ""
     fuzz_examples_run: int = 0

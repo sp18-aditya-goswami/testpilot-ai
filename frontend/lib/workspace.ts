@@ -116,10 +116,27 @@ export interface EndpointNote {
   note: string;
 }
 
+export interface AuthStep {
+  endpoint_id: string;
+  method: string;
+  path: string;
+  body: Record<string, unknown>;
+  form: boolean;
+}
+
+/** How a run gets its own token: optionally sign up a fresh test user, then sign in. */
+export interface LoginFlow {
+  signup: AuthStep | null;
+  login: AuthStep;
+  token_field: string;
+}
+
 export interface AuthContext {
   description: string;
   header_name: string;
+  scheme?: string;
   token_variable: string | null;
+  login?: LoginFlow | null;
   roles: string[];
 }
 

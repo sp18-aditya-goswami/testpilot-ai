@@ -1,13 +1,15 @@
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend import planner
+from backend import ai, planner
 from backend.api.core import load_api, not_found
-from backend.engines.ai_planner import PATH_PARAM, PlanRejected, validate_expected
+from backend.engines.ai_planner import PATH_PARAM, PlanRejected, contract_summary, validate_expected
+from backend.findings import failure_digest
 from backend.runner import execute_run
-from backend.schemas import ApiSummary, Category, RequestSpec, Run, RunCounts, TestCase, TestPlan
+from backend.schemas import ApiSummary, Category, Fix, RequestSpec, Run, RunCounts, TestCase, TestPlan
 from backend.spec_parser import SpecError, ensure_allowed_url
 from backend.state import active_runs, spawn
 from backend.store import NotFound, store
@@ -123,7 +125,7 @@ async def create_plan(body: PlanCreate):
 
         record_suite(body.suite_item_id, last_plan_id=plan.id)
     snapshot = plan.model_copy(deep=True)
-    spawn(planner.run_planning(plan, api, config, sorted(runtime.variables)))
+    spawn(planner.run_planning(plan, api, config, planner.plan_variable_keys(runtime.variables, config)))
     return snapshot
 
 
@@ -179,10 +181,9 @@ async def refine_plan(plan_id: str, body: PlanRefine):
     unknown = [e for e in body.endpoint_ids if e not in known]
     if unknown:
         raise HTTPException(status_code=422, detail=f"Not in the specification: {', '.join(unknown)}")
-    variable_keys: list[str] = []
-    if plan.environment_id:
-        variable_keys = sorted(resolve_environment(plan.environment_id).variables)
     config = PlannerConfig(**plan.config) if plan.config else PlannerConfig()
+    env_keys = resolve_environment(plan.environment_id).variables if plan.environment_id else {}
+    variable_keys = planner.plan_variable_keys(env_keys, config)
 
     plan.status = "planning"
     plan.progress.append("Queued a refinement")
@@ -249,13 +250,70 @@ async def start_run(plan_id: str, body: RunRequest):
 
         record_suite(plan.suite_item_id, last_plan_id=plan.id, last_run_id=run.id)
 
+    auth = (PlannerConfig(**plan.config) if plan.config else PlannerConfig()).auth
+
     async def work():
         try:
             await execute_run(
-                run, plan, api, fuzz_examples=body.fuzz_examples if body.fuzz else None, variables=variables, secrets=secrets
+                run,
+                plan,
+                api,
+                fuzz_examples=body.fuzz_examples if body.fuzz else None,
+                variables=variables,
+                secrets=secrets,
+                login=auth.login,
+                token_variable=auth.token_variable or "token",
             )
         finally:
             active_runs.pop(run.id, None)
 
     spawn(work())
     return run
+
+
+@router.post("/api/runs/{run_id}/cases/{case_id}/fix", response_model=Fix)
+async def suggest_fix(run_id: str, case_id: str):
+    """Asks the AI how to make one failed case pass. The answer is kept on the run, so asking again costs nothing."""
+    if run_id in active_runs:
+        raise HTTPException(status_code=409, detail="The run is still going; ask for a fix when it finishes")
+    try:
+        run = store.load("runs", run_id, Run)
+    except NotFound:
+        raise not_found("Run")
+    case = next((c for c in run.cases if c.id == case_id), None)
+    result = next((r for r in run.results if r.case_id == case_id), None)
+    if case is None or result is None:
+        raise not_found("Case")
+    if result.outcome != "failed":
+        raise HTTPException(status_code=422, detail="Only failed cases have a fix to suggest")
+    if result.fix is not None:
+        return result.fix
+    if not planner.ai_enabled():
+        raise HTTPException(status_code=422, detail="Set up an AI provider in Settings to get fix suggestions")
+
+    contract: list[dict] = []
+    rules = ""
+    if run.plan_id:
+        try:
+            plan = store.load("plans", run.plan_id, TestPlan)
+            rules = plan.business_rules
+            api = load_api(plan.spec_id)
+            contract = contract_summary([e for e in api.endpoints if e.id == case.endpoint_id])
+        except (NotFound, HTTPException):
+            pass
+    try:
+        out = await asyncio.to_thread(
+            ai.suggest_fix, failure_digest(case, result), contract, rules, result.analysis.model_dump() if result.analysis else None
+        )
+    except ai.AiUnavailable as exc:
+        raise HTTPException(status_code=502, detail=f"The AI could not suggest a fix: {exc}")
+    fix = Fix(**out.model_dump())
+    try:  # reload so a fix saved meanwhile for another case is kept
+        run = store.load("runs", run_id, Run)
+    except NotFound:
+        raise not_found("Run")
+    for r in run.results:
+        if r.case_id == case_id:
+            r.fix = fix
+    store.save("runs", run.id, run, project_id=run.project_id)
+    return fix

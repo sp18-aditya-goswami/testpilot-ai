@@ -47,6 +47,11 @@
 .twoCol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md); }
 .finish { gap: var(--space-sm); }
 
+.access { margin-bottom: var(--space-md); }
+.accessHead { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-sm); align-items: start; }
+.accessHead > :global(svg) { margin-top: 0.3em; color: var(--color-ink-2); }
+.accessHead p { max-width: 62ch; overflow-wrap: anywhere; }
+
 @media (max-width: 40rem) {
   .head h1 { font-size: var(--text-2xl); }
   .card, .target { padding: var(--space-md); }

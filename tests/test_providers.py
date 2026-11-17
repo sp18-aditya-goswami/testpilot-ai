@@ -113,6 +113,102 @@ def test_bedrock_catalog_ids_use_the_runtime_client(client):
     assert ai_auth._bedrock_extra(s) == {"output_config": {"effort": s.effort}}
 
 
+def _bedrock_settings(client, model):
+    client.put("/api/settings", json={"ai_provider": "bedrock", "aws_region": "us-west-2", "bedrock_auth": "api_key", "bedrock_api_key": "bedrock-api-key-123456789", "bedrock_model": model})
+
+
+class FakeConverse:
+    """Stands in for the bedrock-runtime client: replays errors and answers in order, recording each request."""
+
+    def __init__(self, *replies):
+        self.replies = list(replies)
+        self.requests = []
+
+    def converse(self, **req):
+        self.requests.append(req)
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+
+def _validation(message):
+    from botocore.exceptions import ClientError
+
+    return ClientError({"Error": {"Code": "ValidationException", "Message": message}}, "Converse")
+
+
+def test_non_anthropic_bedrock_models_use_converse(client, monkeypatch):
+    _bedrock_settings(client, "openai.gpt-oss-120b")
+    assert ai_auth.bedrock_is_anthropic("anthropic.claude-opus-5-5") and ai_auth.bedrock_is_anthropic("arn:aws:bedrock:us-west-2:1:application-inference-profile/x")
+    assert not ai_auth.bedrock_is_anthropic("openai.gpt-oss-120b") and not ai_auth.bedrock_is_anthropic("meta.llama3-3-70b-instruct-v1:0")
+
+    fake = FakeConverse(
+        _validation("This model doesn't support the toolChoice.tool field."),
+        {"output": {"message": {"content": [{"toolUse": {"toolUseId": "t1", "name": "submit_answer", "input": {"word": "ready"}}}]}}, "stopReason": "tool_use"},
+    )
+    monkeypatch.setattr(ai_auth, "_converse_client", lambda *a: fake)
+    assert ai_auth.call_structured("be brief", "say ready", Answer).word == "ready"
+    first, second = fake.requests
+    assert first["modelId"] == "openai.gpt-oss-120b" and first["toolConfig"]["toolChoice"] == {"tool": {"name": "submit_answer"}}
+    assert second["toolConfig"]["toolChoice"] == {"any": {}}  # stepped down after the model refused a forced tool
+    assert "output_config" not in first
+
+    text_only = FakeConverse(
+        _validation("The model does not support tool use."),
+        _validation("Tool use is not supported for this model."),
+        _validation("Tool use is not supported for this model."),
+        {"output": {"message": {"content": [{"reasoningContent": {"reasoningText": {"text": "thinking"}}}, {"text": 'Sure:\n```json\n{"word": "plain"}\n```'}]}}, "stopReason": "end_turn"},
+    )
+    monkeypatch.setattr(ai_auth, "_converse_client", lambda *a: text_only)
+    assert ai_auth.call_structured("s", "u", Answer).word == "plain"
+    assert "toolConfig" not in text_only.requests[-1] and "JSON Schema" in text_only.requests[-1]["system"][0]["text"]
+
+    shrink = FakeConverse(_validation("max_tokens must be at most 8192"), {"output": {"message": {"content": [{"text": '{"word": "ok"}'}]}}})
+    monkeypatch.setattr(ai_auth, "_converse_client", lambda *a: shrink)
+    assert ai_auth.call_structured("s", "u", Answer, max_tokens=16000).word == "ok"
+    assert [r["inferenceConfig"]["maxTokens"] for r in shrink.requests] == [16000, 8000]
+
+    versioned = FakeConverse(_validation("The provided model identifier is invalid."), {"output": {"message": {"content": [{"text": '{"word": "v"}'}]}}})
+    monkeypatch.setattr(ai_auth, "_converse_client", lambda *a: versioned)
+    assert ai_auth.call_structured("s", "u", Answer).word == "v"
+    assert [r["modelId"] for r in versioned.requests] == ["openai.gpt-oss-120b", "openai.gpt-oss-120b-1:0"]
+
+    denied = FakeConverse(_validation("The provided model identifier is invalid."), _validation("The provided model identifier is invalid."))
+    monkeypatch.setattr(ai_auth, "_converse_client", lambda *a: denied)
+    with pytest.raises(ai_auth.AiUnavailable, match="does not offer the model openai.gpt-oss-120b"):
+        ai_auth.call_structured("s", "u", Answer)
+
+    check = FakeConverse(_validation("The provided model identifier is invalid."), {"output": {"message": {"content": [{"text": "ready"}]}}})
+    monkeypatch.setattr(ai_auth, "_converse_client", lambda *a: check)
+    r = client.post("/api/settings/check-ai").json()
+    assert r["ok"] and "openai.gpt-oss-120b-1:0 answered" in r["message"]
+    client.put("/api/settings", json={"bedrock_model": "anthropic.claude-opus-5-5"})
+
+
+def test_bedrock_api_key_is_sent_as_a_bearer_token(client):
+    from botocore.awsrequest import AWSResponse
+
+    _bedrock_settings(client, "openai.gpt-oss-120b")
+    bedrock = ai_auth._converse_client(ai_auth.get_settings(), 5.0, 0)
+    seen = {}
+
+    class Raw:
+        def stream(self, **_):
+            yield json.dumps({"output": {"message": {"role": "assistant", "content": [{"text": "ready"}]}}, "stopReason": "end_turn", "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2}, "metrics": {"latencyMs": 1}}).encode()
+
+    def capture(request, **_):
+        seen.update(request.headers)
+        return AWSResponse(request.url, 200, {"content-type": "application/json"}, Raw())
+
+    bedrock.meta.events.register("before-send.bedrock-runtime.Converse", capture)
+    out = bedrock.converse(modelId="openai.gpt-oss-120b", messages=[{"role": "user", "content": [{"text": "hi"}]}])
+    assert out["output"]["message"]["content"][0]["text"] == "ready"
+    auth = seen["Authorization"]
+    assert (auth.decode() if isinstance(auth, bytes) else auth) == "Bearer bedrock-api-key-123456789"
+    client.put("/api/settings", json={"bedrock_model": "anthropic.claude-opus-5-5"})
+
+
 def test_aws_profile_rejects_a_pasted_key(client):
     r = client.put("/api/settings", json={"aws_profile": "ABSK" + "x" * 100 + "="})
     assert r.status_code == 422 and "short name" in r.json()["detail"]

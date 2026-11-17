@@ -103,16 +103,26 @@ export function Summary({
   else if (run.fuzz_status === "ok" || run.fuzz_status === "error") {
     fuzzLine = `Schemathesis sent ${run.fuzz_examples_run} generated requests.${run.fuzz_message ? ` ${run.fuzz_message}` : ""}`;
   }
-  const extraMessage = run.message && !run.message.startsWith("Failure explanations are rule-based") ? run.message : null;
+  const extraMessage =
+    run.message && !run.message.startsWith("Failure explanations are rule-based") && run.message !== run.auth_note ? run.message : null;
 
   return (
-    <section id="summary" className={styles.reportSection} aria-labelledby="summary-head">
-      <h2 id="summary-head">Summary</h2>
+    <section id="summary" className={styles.reportSection} aria-label="About this run">
       <div className={styles.summaryProse}>
         {sentences(run, results, findings, active).map((s) => (
           <p key={s}>{s}</p>
         ))}
       </div>
+
+      {run.auth_note && (
+        <div className={styles.summaryBlock}>
+          <h3>Sign-in</h3>
+          <p className={styles.runNote}>
+            <Icon name={run.status === "failed" ? "alert" : "key"} />
+            <span>{run.auth_note}</span>
+          </p>
+        </div>
+      )}
 
       <div className={styles.summaryBlock}>
         <h3>Where the cases came from</h3>

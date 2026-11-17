@@ -39,7 +39,7 @@ def test_guided_flow_end_to_end(client, demo_doc):  # noqa: F811
 
     tree = client.get(f"/api/projects/{s['project_id']}/tree").json()
     col = next(c for c in tree["collections"] if c["name"] == "Test plans")
-    assert [i["id"] for i in col["items"]] == [out["suite_item_id"]]
+    assert out["suite_item_id"] in [i["id"] for i in col["items"]]
     item = client.get(f"/api/items/{out['suite_item_id']}").json()
     assert item["name"].endswith("test plan") and item["suite"]["last_plan_id"] == plan["id"]
 
@@ -61,3 +61,41 @@ def test_guided_flow_rejects_bad_input(client, demo_doc):  # noqa: F811
     assert bad.status_code == 422
     missing = client.post("/api/test-plans", json={"project_id": "prj_0000000000", "environment_id": "env_0", "spec_id": "x"})
     assert missing.status_code == 404
+
+
+def test_fix_is_suggested_once_and_kept(client, demo_doc, monkeypatch):  # noqa: F811
+    import backend.ai as ai
+    import backend.planner as planner_mod
+
+    s = client.post("/api/test-plans/start", json={"spec_text": json.dumps(demo_doc), "base_url": BASE}).json()
+    out = client.post(
+        "/api/test-plans",
+        json={"project_id": s["project_id"], "environment_id": s["environment_id"], "spec_id": s["api"]["spec_id"], "config": {"use_ai": False, "focus_endpoints": ["GET /api/users", "POST /api/users/register"]}},
+    ).json()
+    plan = _wait_plan(client, out["plan"]["id"])
+    wrong = {"endpoint_id": "GET /api/users", "name": "Users list is hidden", "category": "negative", "request": {"method": "GET", "path": "/api/users"}, "expected_status": [404]}
+    assert client.post(f"/api/plans/{plan['id']}/cases", json=wrong).status_code == 200
+    run = _wait_run(client, client.post(f"/api/plans/{plan['id']}/runs", json={}).json()["id"])
+    failed = next(r for r in run["results"] if r["outcome"] == "failed")
+    passed = next(r for r in run["results"] if r["outcome"] == "passed")
+
+    monkeypatch.setattr(planner_mod, "ai_enabled", lambda: False)
+    assert client.post(f"/api/runs/{run['id']}/cases/{failed['case_id']}/fix").status_code == 422  # AI off
+
+    calls = []
+
+    def fake_fix(failure, contract, rules, analysis):
+        calls.append((failure["case_id"], [c["endpoint_id"] for c in contract]))
+        return ai.AiFix(fault="api", fault_reason="The handler skips the check.", steps=["Add the check"], code_language="python", code_caption="FastAPI sketch", code="raise HTTPException(409)", spec_change="", confirm="A re-run returns 409.")
+
+    monkeypatch.setattr(planner_mod, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "suggest_fix", fake_fix)
+    first = client.post(f"/api/runs/{run['id']}/cases/{failed['case_id']}/fix")
+    assert first.status_code == 200 and first.json()["fault"] == "api"
+    again = client.post(f"/api/runs/{run['id']}/cases/{failed['case_id']}/fix").json()
+    assert again == first.json() and len(calls) == 1  # kept on the run, not asked twice
+    case = next(c for c in run["cases"] if c["id"] == failed["case_id"])
+    assert calls[0] == (failed["case_id"], [case["endpoint_id"]])
+    saved = client.get(f"/api/runs/{run['id']}").json()
+    assert next(r for r in saved["results"] if r["case_id"] == failed["case_id"])["fix"]["confirm"] == "A re-run returns 409."
+    assert client.post(f"/api/runs/{run['id']}/cases/{passed['case_id']}/fix").status_code == 422

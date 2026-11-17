@@ -1,7 +1,7 @@
 """API contract for the workspace: projects, environments, collections, folders, items and settings."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -307,10 +307,30 @@ class EndpointNote(BaseModel):
     note: str = Field(max_length=1000)
 
 
+class AuthStep(BaseModel):
+    """One request of the sign-in sequence a run performs before its tests."""
+
+    endpoint_id: str
+    method: str
+    path: str
+    body: dict[str, Any] = {}
+    form: bool = False  # send as application/x-www-form-urlencoded (OAuth2 password login)
+
+
+class LoginFlow(BaseModel):
+    """How a run gets its own token: optionally register a fresh test user, then sign in and read the token."""
+
+    signup: AuthStep | None = None
+    login: AuthStep
+    token_field: str = ""  # dotted path in the sign-in response, when the spec names it
+
+
 class AuthContext(BaseModel):
     description: str = Field(default="", max_length=1000)  # e.g. "Bearer token; admins can delete, users cannot"
     header_name: str = "Authorization"
+    scheme: str = "Bearer"  # what goes before the token in the header; empty sends the token alone (API keys)
     token_variable: str | None = None  # environment variable holding a valid token, e.g. "token"
+    login: LoginFlow | None = None  # when set, each run signs in first and fills token_variable itself
     roles: list[str] = []  # roles the API distinguishes, each optionally backed by an env variable "<role>_token"
 
 

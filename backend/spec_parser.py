@@ -82,6 +82,13 @@ def _json_schema_from_content(content: dict[str, Any] | None) -> dict[str, Any] 
     return first.get("schema")
 
 
+def _body_media(content: dict[str, Any] | None) -> str | None:
+    """The request body's media type: JSON when offered, otherwise the first one listed."""
+    if not content:
+        return None
+    return next((m for m in content if "json" in m), next(iter(content)))
+
+
 def parse_spec(doc: dict[str, Any]) -> ApiSummary:
     root = _resolve(doc, doc)
     is_swagger2 = "swagger" in root
@@ -106,12 +113,14 @@ def parse_spec(doc: dict[str, Any]) -> ApiSummary:
             params: list[Parameter] = []
             body_schema: dict[str, Any] | None = None
             body_required = False
+            body_media: str | None = None
             for p in [*shared_params, *op.get("parameters", [])]:
                 if p.get("in") == "body":
                     body_schema = p.get("schema") or {}
                     body_required = bool(p.get("required"))
                     continue
                 if p.get("in") == "formData":
+                    body_media = "application/x-www-form-urlencoded"
                     continue
                 schema = p.get("schema") or {k: p[k] for k in ("type", "format", "enum") if k in p}
                 params.append(
@@ -127,6 +136,9 @@ def parse_spec(doc: dict[str, Any]) -> ApiSummary:
             if "requestBody" in op:
                 body_schema = _json_schema_from_content(op["requestBody"].get("content"))
                 body_required = bool(op["requestBody"].get("required"))
+                body_media = _body_media(op["requestBody"].get("content"))
+            elif body_schema is not None:
+                body_media = "application/json"
 
             responses: dict[str, dict[str, Any] | None] = {}
             for code, resp in (op.get("responses") or {}).items():
@@ -144,6 +156,7 @@ def parse_spec(doc: dict[str, Any]) -> ApiSummary:
                     parameters=params,
                     request_body_schema=body_schema,
                     request_body_required=body_required,
+                    request_body_media=body_media,
                     responses=responses,
                     requires_auth=bool(op["security"]) if "security" in op else global_security,
                 )
@@ -160,4 +173,10 @@ def parse_spec(doc: dict[str, Any]) -> ApiSummary:
         openapi_version=str(root.get("openapi") or root.get("swagger")),
         server_url=server_url,
         endpoints=endpoints,
+        security_schemes=_security_schemes(root, is_swagger2),
     )
+
+
+def _security_schemes(root: dict[str, Any], is_swagger2: bool) -> dict[str, Any]:
+    raw = root.get("securityDefinitions") if is_swagger2 else (root.get("components") or {}).get("securitySchemes")
+    return {k: v for k, v in (raw or {}).items() if isinstance(v, dict)}

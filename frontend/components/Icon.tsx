@@ -26,6 +26,7 @@ const PATHS = {
   dice: "M3 3h10v10H3z M5.8 5.8h.01 M10.2 10.2h.01 M8 8h.01",
   spec: "M4 2.5h5.5L12 5v8.5H4z M9.5 2.5V5H12 M6 8h4 M6 10.5h4",
   history: "M8 4.5V8l2.5 1.5 M2.8 8a5.2 5.2 0 1 0 1.5-3.7 M2.5 2.8v2.5H5",
+  key: "M5.5 7.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 1 0 0-5z M7.3 8.2 13 2.5 M11 4.5l1.5 1.5 M9.5 6l1.2 1.2",
 } as const;
 
 export type IconName = keyof typeof PATHS;

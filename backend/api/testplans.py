@@ -12,6 +12,7 @@ from backend import workspace_repo as repo
 from backend.api.core import RunListItem
 from backend.api.navigation import _run_item
 from backend.api.planning import create_plan
+from backend.auth_detect import PASSWORD_VAR, USERNAME_VAR, AuthDetection, detect
 from backend.db import ItemRow, ProjectRow, session
 from backend.engines.examples import example_for
 from backend.schemas import ApiSummary, Run, TestPlan
@@ -50,12 +51,30 @@ class StartIn(BaseModel):
         return self
 
 
+class AccessStatus(BaseModel):
+    """How runs of this API authenticate, and whether the environment already holds what that needs."""
+
+    auth: AuthDetection
+    has_token: bool
+    has_login: bool
+    needs_input: bool
+
+
+class AccessIn(BaseModel):
+    spec_id: str
+    environment_id: str
+    token: str | None = Field(default=None, max_length=4000)
+    username: str | None = Field(default=None, max_length=320)
+    password: str | None = Field(default=None, max_length=1000)
+
+
 class StartOut(BaseModel):
     project_id: str
     project_name: str
     environment_id: str
     environment_name: str
     has_token: bool
+    access: AccessStatus
     api: ApiSummary
 
 
@@ -119,10 +138,69 @@ def _environment_for(project_id: str, base_url: str, token: str | None) -> tuple
         variables = [EnvVarIn(key=TOKEN_VARIABLE, value=token, secret=True)] if token else []
         env = _guard(lambda: repo.create_environment(project_id, EnvironmentIn(name=name, base_url=wanted, variables=variables, is_default=not taken)))
     elif token:
-        keep = [EnvVarIn(key=v.key, value=None if v.secret else v.value, secret=v.secret) for v in env.variables if v.key != TOKEN_VARIABLE]
-        keep.append(EnvVarIn(key=TOKEN_VARIABLE, value=token, secret=True))
-        env = _guard(lambda: repo.update_environment(env.id, EnvironmentPatch(variables=keep)))
+        env = _guard(lambda: _set_variables(env.id, {TOKEN_VARIABLE: (token, True)}))
     return env.id, env.name
+
+
+def _environment(environment_id: str):
+    project_id = _guard(lambda: repo.environment_project(environment_id))
+    env = next((e for e in _guard(lambda: repo.project_tree(project_id)).environments if e.id == environment_id), None)
+    if env is None:
+        raise HTTPException(status_code=404, detail="Environment not found")
+    return env
+
+
+def _set_variables(environment_id: str, values: dict[str, tuple[str, bool]]):
+    """Sets variables on an environment and keeps the others; secret values are never read back, only kept."""
+    env = _environment(environment_id)
+    keep = [EnvVarIn(key=v.key, value=None if v.secret else v.value, secret=v.secret) for v in env.variables if v.key not in values]
+    keep += [EnvVarIn(key=k, value=value, secret=secret) for k, (value, secret) in values.items()]
+    return repo.update_environment(environment_id, EnvironmentPatch(variables=keep))
+
+
+def access_status(api: ApiSummary, environment_id: str) -> AccessStatus:
+    auth = detect(api)
+    filled = {v.key for v in _environment(environment_id).variables if v.has_value}
+    has_token = TOKEN_VARIABLE in filled
+    has_login = {USERNAME_VAR, PASSWORD_VAR} <= filled
+    needs = (auth.mode == "token" and not has_token) or (auth.mode == "credentials" and not has_login)
+    return AccessStatus(auth=auth, has_token=has_token, has_login=has_login, needs_input=needs)
+
+
+def _load_api(spec_id: str) -> ApiSummary:
+    try:
+        return store.load("specs", spec_id, ApiSummary)
+    except NotFound:
+        raise HTTPException(status_code=404, detail="Specification not found")
+
+
+@router.get("/api/test-plans/access", response_model=AccessStatus)
+def get_access(spec_id: str, environment_id: str):
+    return access_status(_load_api(spec_id), environment_id)
+
+
+@router.post("/api/test-plans/access", response_model=AccessStatus)
+def save_access(body: AccessIn):
+    """Stores what the spec's auth needs on the environment: a token, or a test login. Secrets are never sent back."""
+    api = _load_api(body.spec_id)
+    owner = store.project_of("specs", api.spec_id)
+    if owner and owner != _guard(lambda: repo.environment_project(body.environment_id)):
+        raise HTTPException(status_code=422, detail="That environment belongs to another project")
+    values: dict[str, tuple[str, bool]] = {}
+    token = (body.token or "").strip()
+    username = (body.username or "").strip()
+    password = body.password or ""
+    if token:
+        values[TOKEN_VARIABLE] = (token, True)
+    if username or password:
+        if not (username and password):
+            raise HTTPException(status_code=422, detail="Enter both the test login and its password")
+        values[USERNAME_VAR] = (username, False)
+        values[PASSWORD_VAR] = (password, True)
+    if not values:
+        raise HTTPException(status_code=422, detail="Nothing to save")
+    _guard(lambda: _set_variables(body.environment_id, values))
+    return access_status(api, body.environment_id)
 
 
 @router.post("/api/test-plans/start", response_model=StartOut)
@@ -155,13 +233,14 @@ def start(body: StartIn):
             if p.location == "path":
                 path_defaults.setdefault(p.name, str(example_for(p.schema_, p.name)))
     repo.add_missing_variables(project_id, path_defaults)
-    has_token = any(v.key == TOKEN_VARIABLE and v.has_value for e in repo.project_tree(project_id).environments if e.id == environment_id for v in e.variables)
+    access = access_status(api, environment_id)
     return StartOut(
         project_id=project_id,
         project_name=project_name,
         environment_id=environment_id,
         environment_name=environment_name,
-        has_token=has_token,
+        has_token=access.has_token,
+        access=access,
         api=api,
     )
 
@@ -180,10 +259,7 @@ async def create_test_plan(body: TestPlanIn):
     _guard(lambda: repo.require_project(body.project_id))
     if _guard(lambda: repo.environment_project(body.environment_id)) != body.project_id:
         raise HTTPException(status_code=422, detail="That environment belongs to another project")
-    try:
-        api = store.load("specs", body.spec_id, ApiSummary)
-    except NotFound:
-        raise HTTPException(status_code=404, detail="Specification not found")
+    api = _load_api(body.spec_id)
 
     collection_id = _plans_collection(body.project_id)
     name = (body.name or "").strip() or f"{api.title} test plan"

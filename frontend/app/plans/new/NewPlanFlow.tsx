@@ -8,11 +8,10 @@ import { Icon } from "@/components/Icon";
 import { MethodPath } from "@/components/Status";
 import { Steps } from "@/components/Steps";
 import { api, errorMessage, type ApiSummary } from "@/lib/api";
-import { flowHref, testPlans } from "@/lib/testplans";
+import { flowHref, testPlans, type AccessStatus } from "@/lib/testplans";
 import { DEFAULT_PLANNER_CONFIG, OBJECTIVES, ws, type BusinessRule, type Depth, type Item, type Objective, type PlannerConfig } from "@/lib/workspace";
+import { AccessForm, authFor } from "./AccessForm";
 import styles from "./new-plan.module.css";
-
-const TOKEN_VARIABLE = "token";
 
 const DEPTH: { id: Depth; label: string; hint: string }[] = [
   { id: "quick", label: "Quick", hint: "about 3 AI cases per endpoint" },
@@ -27,7 +26,7 @@ interface Target {
   environmentId: string;
   environmentName: string;
   baseUrl: string;
-  hasToken: boolean;
+  access: AccessStatus | null;
   api: ApiSummary;
 }
 
@@ -60,7 +59,7 @@ export function NewPlanFlow() {
   const suiteParam = params.get("suite");
   const projectParam = params.get("project");
   const specParam = params.get("spec");
-  const ids = { spec: useId(), paste: useId(), base: useId(), token: useId(), name: useId(), rules: useId(), instruction: useId(), data: useId(), exclusions: useId(), auth: useId() };
+  const ids = { spec: useId(), paste: useId(), base: useId(), name: useId(), rules: useId(), instruction: useId(), data: useId(), exclusions: useId(), auth: useId() };
 
   const [step, setStep] = useState<1 | 2>(suiteParam || specParam ? 2 : 1);
   const [loading, setLoading] = useState(!!(suiteParam || specParam));
@@ -73,7 +72,6 @@ export function NewPlanFlow() {
   const [specText, setSpecText] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [baseTouched, setBaseTouched] = useState(false);
-  const [token, setToken] = useState("");
   const [fixedSpec, setFixedSpec] = useState<{ projectId: string; projectName: string; api: ApiSummary } | null>(null);
 
   // step 2
@@ -105,6 +103,7 @@ export function NewPlanFlow() {
           }
           const env = tree.environments.find((e) => e.id === envId) ?? tree.environments.find((e) => e.is_default) ?? tree.environments[0];
           if (!env) throw new Error("This project has no environment yet. Add one in the workspace first.");
+          const access = await testPlans.access(spec.spec_id, env.id).catch(() => null);
           if (cancelled) return;
           const cfg = { ...DEFAULT_PLANNER_CONFIG, ...item.suite.config };
           setSuite(item);
@@ -117,13 +116,14 @@ export function NewPlanFlow() {
             environmentId: env.id,
             environmentName: env.name,
             baseUrl: env.base_url,
-            hasToken: env.variables.some((v) => v.key === TOKEN_VARIABLE && v.has_value),
+            access,
             api: spec,
           });
         } else if (projectParam && specParam) {
           const [tree, spec] = await Promise.all([ws.tree(projectParam), api.spec(specParam)]);
-          if (cancelled) return;
           const env = tree.environments.find((e) => e.is_default) ?? tree.environments[0];
+          const access = env ? await testPlans.access(spec.spec_id, env.id).catch(() => null) : null;
+          if (cancelled) return;
           setName(`${spec.title} test plan`);
           if (env) {
             setTarget({
@@ -132,7 +132,7 @@ export function NewPlanFlow() {
               environmentId: env.id,
               environmentName: env.name,
               baseUrl: env.base_url,
-              hasToken: env.variables.some((v) => v.key === TOKEN_VARIABLE && v.has_value),
+              access,
               api: spec,
             });
           } else {
@@ -166,32 +166,31 @@ export function NewPlanFlow() {
     if (!originOf(server)) return setError("Enter the server to test as an http or https address, for example http://localhost:8000.");
     setBusy(true);
     try {
+      let next: Target;
       if (fixedSpec) {
-        const env = await ws.createEnvironment(fixedSpec.projectId, {
-          name: "Default",
-          base_url: server,
-          is_default: true,
-          variables: token.trim() ? [{ key: TOKEN_VARIABLE, value: token.trim(), secret: true }] : [],
-        });
-        setTarget({ projectId: fixedSpec.projectId, projectName: fixedSpec.projectName, environmentId: env.id, environmentName: env.name, baseUrl: env.base_url, hasToken: !!token.trim(), api: fixedSpec.api });
+        const env = await ws.createEnvironment(fixedSpec.projectId, { name: "Default", base_url: server, is_default: true, variables: [] });
+        const access = await testPlans.access(fixedSpec.api.spec_id, env.id).catch(() => null);
+        next = { projectId: fixedSpec.projectId, projectName: fixedSpec.projectName, environmentId: env.id, environmentName: env.name, baseUrl: env.base_url, access, api: fixedSpec.api };
       } else {
-        const out = await testPlans.start({
-          ...(source === "link" ? { spec_url: specUrl.trim() } : { spec_text: specText }),
-          base_url: server,
-          token: token.trim() || undefined,
-        });
-        setTarget({ projectId: out.project_id, projectName: out.project_name, environmentId: out.environment_id, environmentName: out.environment_name, baseUrl: server.replace(/\/+$/, ""), hasToken: out.has_token, api: out.api });
+        const out = await testPlans.start({ ...(source === "link" ? { spec_url: specUrl.trim() } : { spec_text: specText }), base_url: server });
+        next = { projectId: out.project_id, projectName: out.project_name, environmentId: out.environment_id, environmentName: out.environment_name, baseUrl: server.replace(/\/+$/, ""), access: out.access, api: out.api };
         if (!name) setName(`${out.api.title} test plan`);
       }
-      setToken("");
-      setStep(2);
-      window.scrollTo({ top: 0 });
+      setTarget(next);
+      if (!next.access?.needs_input) goToStep2();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
   }
+
+  function goToStep2() {
+    setStep(2);
+    window.scrollTo({ top: 0 });
+  }
+
+  const accessSaved = (access: AccessStatus) => setTarget((t) => (t ? { ...t, access } : t));
 
   async function buildPlan(e: React.FormEvent) {
     e.preventDefault();
@@ -205,7 +204,7 @@ export function NewPlanFlow() {
       ...config,
       use_ai: useAi,
       business_rules: rulesFromText(rulesText, config.business_rules),
-      auth: target.hasToken && !config.auth.token_variable ? { ...config.auth, token_variable: TOKEN_VARIABLE } : config.auth,
+      auth: authFor(config.auth, target.access),
     };
     const planName = name.trim() || `${target.api.title} test plan`;
     setBusy(true);
@@ -265,6 +264,35 @@ export function NewPlanFlow() {
             Back to test plans
           </Link>
         </div>
+      </>
+    );
+  }
+
+  if (step === 1 && target?.access?.needs_input) {
+    return (
+      <>
+        <Breadcrumbs items={crumbs} />
+        <Steps current={1} />
+        <div className={styles.head}>
+          <h1>One more thing before planning.</h1>
+          <p>
+            TestPilot read {target.api.title}: {target.api.endpoints.length} {target.api.endpoints.length === 1 ? "endpoint" : "endpoints"}, tested on{" "}
+            <span className="mono">{target.baseUrl}</span>.
+          </p>
+        </div>
+        <AccessForm
+          access={target.access}
+          specId={target.api.spec_id}
+          environmentId={target.environmentId}
+          onSaved={(access) => {
+            accessSaved(access);
+            goToStep2();
+          }}
+          onSkip={goToStep2}
+        />
+        <button type="button" className="key key--plain" onClick={() => setTarget(null)}>
+          Back to the spec and server
+        </button>
       </>
     );
   }
@@ -348,11 +376,7 @@ export function NewPlanFlow() {
               />
               <p className="helper">Every test request goes here. Use a staging or local server, never production.</p>
             </div>
-            <div className="field">
-              <label htmlFor={ids.token}>Auth token (optional)</label>
-              <input id={ids.token} name="token" className="input mono" type="password" autoComplete="off" placeholder="Leave empty if the API needs no login" value={token} onChange={(e) => setToken(e.target.value)} />
-              <p className="helper">Sent as a Bearer token. Stored as a secret and never shown again or saved in reports.</p>
-            </div>
+            <p className="helper">No token needed here. TestPilot reads the spec and asks for a login only when the API needs one it cannot get by itself.</p>
           </div>
 
           <p className={`helper ${error ? "is-error" : ""}`} role={error ? "alert" : undefined}>
@@ -389,7 +413,6 @@ export function NewPlanFlow() {
           <span className={styles.targetTitle}>{target.api.title}</span>
           <span className="muted small">
             {endpoints.length} {endpoints.length === 1 ? "endpoint" : "endpoints"}, tested on <span className="mono">{target.baseUrl}</span>
-            {target.hasToken ? " with your token" : ""}
           </span>
         </div>
         {!editing && !fixedSpec && !(projectParam && specParam) ? (

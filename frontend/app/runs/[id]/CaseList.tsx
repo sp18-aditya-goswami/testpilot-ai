@@ -35,7 +35,7 @@ const OUTCOME_ICON = {
 } as const;
 
 /** "Expected 404, got 200", or why there is no answer to compare. */
-function expectedVsGot(c: TestCase, r: CaseResult | undefined): string {
+export function expectedVsGot(c: TestCase, r: CaseResult | undefined): string {
   const expected = `Expected ${c.expected_status.join(" or ")}`;
   if (!r) return `${expected}, not run yet`;
   if (r.outcome === "skipped") return r.note || "Skipped";

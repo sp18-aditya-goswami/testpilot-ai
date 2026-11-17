@@ -14,7 +14,8 @@ import { flowHref } from "@/lib/testplans";
 import { ACTIVE, SOURCE_KIND_LABEL, STATUS_WORDS, formatDuration, formatStarted, isFlowPath, planHref, runHref, runTitle, seconds } from "../format";
 import styles from "../runs.module.css";
 import { CaseList, OUTCOME_FILTERS, SOURCE_FILTERS, type OutcomeFilter, type SourceFilter } from "./CaseList";
-import { Finding, SeverityText, findingId, groupAnchor, groupFindings, groupTitle, type FindingItem } from "./Finding";
+import { groupAnchor, groupFindings, groupTitle, type FindingItem } from "./Finding";
+import { FindingTable } from "./FindingTable";
 import { Summary } from "./Summary";
 
 function useNow(active: boolean) {
@@ -67,7 +68,8 @@ export function RunView({ id }: { id: string }) {
 
   const [run, setRun] = useState<Run | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [focused, setFocused] = useState<string | null>(null);
+  const [openFinding, setOpenFinding] = useState<string | null>(null);
+  const [casesOpen, setCasesOpen] = useState(false);
   const [rerunning, setRerunning] = useState(false);
   const [rerunError, setRerunError] = useState<string | null>(null);
   const projectCtx = useOptionalProject();
@@ -157,13 +159,12 @@ export function RunView({ id }: { id: string }) {
   });
   const sourcesPresent = new Set(run.cases.map((c) => c.source));
 
+  /** Opens the finding that holds this case and brings it into view. */
   const goToFinding = (caseId: string) => {
-    setFocused(caseId);
-    const el = document.getElementById(findingId(caseId));
-    if (el) {
-      el.scrollIntoView({ block: "start" });
-      el.focus({ preventScroll: true });
-    }
+    const group = findings.find((g) => g.members.some((m) => m.testCase.id === caseId));
+    if (!group) return;
+    setOpenFinding(group.key);
+    requestAnimationFrame(() => document.getElementById(groupAnchor(group))?.scrollIntoView({ block: "start" }));
   };
 
   const isSuite = run.source_kind === "suite";
@@ -247,7 +248,16 @@ export function RunView({ id }: { id: string }) {
           </p>
           {!active && worst && (
             <p className={styles.verdictWorst}>
-              Most severe: <a href={`#${groupAnchor(worst)}`}>{groupTitle(worst)}</a>
+              Most severe:{" "}
+              <a
+                href={`#${groupAnchor(worst)}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  goToFinding(worst.members[0].testCase.id);
+                }}
+              >
+                {groupTitle(worst)}
+              </a>
             </p>
           )}
           <OutcomeBar counts={{ ...run.counts, total }} />
@@ -338,99 +348,81 @@ export function RunView({ id }: { id: string }) {
         </section>
       ) : (
         <div className={styles.report}>
-          <nav className={styles.contents} aria-label="Report contents">
-            <ol>
-              <li>
-                <a href="#summary" className={styles.contentsLink}>
-                  Summary
-                </a>
-              </li>
-              <li>
-                <a href="#findings" className={styles.contentsLink}>
-                  Findings
-                  <span className={styles.contentsCount}>{findings.length}</span>
-                </a>
-                {findings.length > 0 && (
-                  <ol className={styles.contentsFindings}>
-                    {findings.map((g, i) => (
-                      <li key={g.key}>
-                        <a href={`#${groupAnchor(g)}`} className={styles.contentsFinding}>
-                          <span className={styles.contentsNum}>{i + 1}</span>
-                          <span className={styles.contentsText}>
-                            <SeverityText severity={g.severity} />
-                            <span className={styles.contentsTitle}>{groupTitle(g)}</span>
-                          </span>
-                        </a>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </li>
-              <li>
-                <a href="#cases" className={styles.contentsLink}>
-                  All cases
-                  <span className={styles.contentsCount}>{total}</span>
-                </a>
-              </li>
-            </ol>
-          </nav>
+          {run.status === "failed" && run.message && (
+            <p className="notice" role="alert">
+              <Icon name="alert" />
+              <span>{run.message}</span>
+            </p>
+          )}
 
-          <div className={styles.reportBody}>
-            <Summary run={run} results={resultsById} findings={findings} active={active} />
-
-            <section id="findings" className={styles.reportSection} aria-labelledby="findings-head">
-              <div className={styles.sectionHead}>
-                <h2 id="findings-head">Findings</h2>
-                {findings.length > 0 && (
-                  <p className={styles.caption}>
-                    {findings.length === failedCount
-                      ? `${failedCount} failed ${failedCount === 1 ? "case" : "cases"}, most severe first.`
-                      : `${failedCount} failed cases grouped into ${findings.length} findings where they share one cause, most severe first.`}
-                  </p>
-                )}
-              </div>
-              {findings.length === 0 ? (
-                <p className={`notice ${active ? "" : styles.allClear}`}>
-                  <Icon name={active ? "minus" : "check"} />
-                  <span>{active ? "No failures so far. Findings appear here as cases finish." : "No case failed. Every check passed or was skipped."}</span>
+          <section id="findings" className={styles.reportSection} aria-labelledby="findings-head">
+            <div className={styles.sectionHead}>
+              <h2 id="findings-head">What to fix</h2>
+              {findings.length > 0 && (
+                <p className={styles.caption}>
+                  {findings.length === failedCount
+                    ? `${failedCount} failed ${failedCount === 1 ? "case" : "cases"}, most severe first. Open a row for the request, the response and a fix.`
+                    : `${failedCount} failed cases from ${findings.length} causes, most severe first. Open a row for the request, the response and a fix.`}
                 </p>
-              ) : (
-                <div className={styles.findings}>
-                  {findings.map((g, i) => (
-                    <Finding key={g.key} group={g} index={i + 1} total={findings.length} focusedId={focused} />
-                  ))}
-                </div>
               )}
-            </section>
+            </div>
+            {findings.length === 0 ? (
+              <p className={`notice ${active ? "" : styles.allClear}`}>
+                <Icon name={active ? "minus" : "check"} />
+                <span>{active ? "No failures so far. They appear here as cases finish." : "Nothing to fix. Every check passed or was skipped."}</span>
+              </p>
+            ) : (
+              <FindingTable run={run} findings={findings} open={openFinding} onToggle={(key) => setOpenFinding((k) => (k === key ? null : key))} flow={flow} />
+            )}
+          </section>
 
-            <section id="cases" className={styles.reportSection} aria-labelledby="cases-head">
-              <div className={styles.sectionHead}>
-                <h2 id="cases-head">All cases</h2>
-                <p className={styles.caption}>Grouped by endpoint. Open a row to see why the case exists, what was sent and every check.</p>
-              </div>
-              <div className={styles.filters}>
-                <div className="tray" role="group" aria-label="Show cases by result">
-                  {OUTCOME_FILTERS.map((f) => (
-                    <button key={f.key} type="button" aria-pressed={show === f.key} onClick={() => setParam("show", f.key)}>
-                      {f.label}
-                    </button>
-                  ))}
+          <details id="cases" className={`panel ${styles.fold}`} open={casesOpen} onToggle={(e) => setCasesOpen((e.target as HTMLDetailsElement).open)}>
+            <summary>
+              <span className={styles.foldTitle}>All {total} cases</span>
+              <span className={styles.foldMeta}>
+                {run.counts.passed > 0 && <span className={styles.passedText}>{run.counts.passed} passed</span>}
+                {run.counts.failed > 0 && <span className={styles.failedText}>{run.counts.failed} failed</span>}
+                {run.counts.skipped + run.counts.error > 0 && <span>{run.counts.skipped + run.counts.error} skipped or not run</span>}
+              </span>
+            </summary>
+            {casesOpen && (
+              <div className={styles.foldBody}>
+                <div className={styles.filters}>
+                  <div className="tray" role="group" aria-label="Show cases by result">
+                    {OUTCOME_FILTERS.map((f) => (
+                      <button key={f.key} type="button" aria-pressed={show === f.key} onClick={() => setParam("show", f.key)}>
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="tray" role="group" aria-label="Show cases by who made them">
+                    {SOURCE_FILTERS.filter((f) => f.key === "all" || sourcesPresent.has(f.key)).map((f) => (
+                      <button key={f.key} type="button" aria-pressed={sourceFilter === f.key} onClick={() => setParam("source", f.key)}>
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="tray" role="group" aria-label="Show cases by who made them">
-                  {SOURCE_FILTERS.filter((f) => f.key === "all" || sourcesPresent.has(f.key)).map((f) => (
-                    <button key={f.key} type="button" aria-pressed={sourceFilter === f.key} onClick={() => setParam("source", f.key)}>
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
+                {rows.length === 0 ? (
+                  <p className={`muted ${styles.noRows}`}>No case matches these filters.</p>
+                ) : (
+                  <CaseList cases={rows} results={resultsById} onGoToFinding={goToFinding} />
+                )}
               </div>
-              {rows.length === 0 ? (
-                <p className={`muted ${styles.noRows}`}>No case matches these filters.</p>
-              ) : (
-                <CaseList cases={rows} results={resultsById} onGoToFinding={goToFinding} />
-              )}
-            </section>
-          </div>
+            )}
+          </details>
+
+          <details className={`panel ${styles.fold}`}>
+            <summary>
+              <span className={styles.foldTitle}>About this run</span>
+              <span className={styles.foldMeta}>
+                <span>{run.auth_note ? "sign-in, " : ""}where the cases came from, how failures were explained</span>
+              </span>
+            </summary>
+            <div className={styles.foldBody}>
+              <Summary run={run} results={resultsById} findings={findings} active={active} />
+            </div>
+          </details>
         </div>
       )}
     </>

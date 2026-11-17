@@ -243,7 +243,7 @@ function AiSection({ settings, onChange }: { settings: Settings; onChange: (s: S
         {provider === "bedrock" && (
           <>
             <p className="small">
-              Runs Anthropic models through Amazon Bedrock, billed to your AWS account and credits. Enable the model in the Bedrock console for the region first.
+              Runs any model Amazon Bedrock hosts (Anthropic, OpenAI gpt-oss, Llama, Nova, Mistral and more), billed to your AWS account. Enable the model in the Bedrock console for the region first.
             </p>
             <div className={styles.grid}>
               <div className="field">
@@ -267,7 +267,7 @@ function AiSection({ settings, onChange }: { settings: Settings; onChange: (s: S
               <div className="field">
                 <label htmlFor={ids.model}>Model or inference profile</label>
                 <input id={ids.model} className="input mono" autoComplete="off" spellCheck={false} value={bedrockModel} onChange={(e) => setBedrockModel(e.target.value)} />
-                <p className="helper">Paste the model id or inference profile id from the Bedrock console for this region, for example anthropic.claude-opus-5-5 or apac.anthropic.claude-sonnet-4-5-20250929-v1:0.</p>
+                <p className="helper">Paste the model id or inference profile id from the Bedrock console for this region, for example anthropic.claude-opus-5-5, apac.anthropic.claude-sonnet-4-5-20250929-v1:0 or openai.gpt-oss-120b-1:0. Anthropic models give the best plans.</p>
               </div>
             </div>
 

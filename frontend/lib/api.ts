@@ -111,6 +111,19 @@ export interface Analysis {
   likely_cause: string;
   investigation_steps: string[];
   source: "ai" | "rules";
+  cause_group?: string;
+}
+
+/** How to make a failed case pass, suggested by AI on request. */
+export interface Fix {
+  fault: "api" | "test" | "spec";
+  fault_reason: string;
+  steps: string[];
+  code_language: string;
+  code_caption: string;
+  code: string;
+  spec_change: string;
+  confirm: string;
 }
 
 export type Outcome = "passed" | "failed" | "error" | "skipped";
@@ -124,6 +137,7 @@ export interface CaseResult {
   analysis: Analysis | null;
   regression_test: string | null;
   note: string;
+  fix?: Fix | null;
 }
 
 export interface RunCounts {
@@ -158,6 +172,8 @@ export interface Run {
   message: string;
   fuzz_status: "off" | "running" | "ok" | "error";
   fuzz_message: string;
+  auth_note?: string;
+  auth_exchanges?: Exchange[];
   fuzz_examples_run: number;
 }
 
@@ -243,6 +259,8 @@ export const api = {
     request<Run>(`/api/plans/${encodeURIComponent(planId)}/runs`, { method: "POST", body: JSON.stringify(input) }),
   runs: () => request<RunListItem[]>("/api/runs"),
   run: (id: string) => request<Run>(`/api/runs/${encodeURIComponent(id)}`),
+  suggestFix: (runId: string, caseId: string) =>
+    request<Fix>(`/api/runs/${encodeURIComponent(runId)}/cases/${encodeURIComponent(caseId)}/fix`, { method: "POST" }),
   reportHtmlUrl: (id: string) => `/api/runs/${encodeURIComponent(id)}/report.html`,
   reportJsonUrl: (id: string) => `/api/runs/${encodeURIComponent(id)}/report.json`,
 };

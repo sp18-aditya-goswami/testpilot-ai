@@ -45,6 +45,20 @@ def env_runtime(environment_id: str):
     return environment_runtime(environment_id)
 
 
+def plan_variable_keys(env_keys, config: PlannerConfig) -> list[str]:
+    """Environment variables plus the token a signing-in plan gets at run time."""
+    keys = set(env_keys)
+    if config.auth.login is not None and config.auth.token_variable:
+        keys.add(config.auth.token_variable)
+    return sorted(keys)
+
+
+def auth_header_value(config: PlannerConfig) -> str:
+    token = f"{{{{{config.auth.token_variable}}}}}"
+    scheme = (config.auth.scheme or "").strip()
+    return f"{scheme} {token}" if scheme else token
+
+
 def ai_enabled() -> bool:
     return get_settings().ai_enabled
 
@@ -81,7 +95,9 @@ def build_context(endpoints: list[Endpoint], config: PlannerConfig, variable_key
     if auth.description.strip():
         auth_lines.append(auth.description.strip())
     if auth.token_variable:
-        auth_lines.append(f'Valid requests send the header "{auth.header_name}: Bearer {{{{{auth.token_variable}}}}}".')
+        auth_lines.append(f'Valid requests send the header "{auth.header_name}: {auth_header_value(config)}".')
+    if auth.login is not None:
+        auth_lines.append("TestPilot signs in before the run, so do not write sign-up or sign-in setup steps just to get a token.")
     if auth.roles:
         role_vars = [f"{r}: {{{{{r}_token}}}}" if f"{r}_token" in variable_keys else f"{r}: no token variable" for r in auth.roles]
         auth_lines.append("Roles and their token variables: " + "; ".join(role_vars) + ".")
@@ -141,7 +157,7 @@ def apply_auth(case: TestCase, config: PlannerConfig, variable_keys: set[str], m
     token = config.auth.token_variable
     if not token or token not in variable_keys:
         return
-    header, value = config.auth.header_name or "Authorization", f"Bearer {{{{{token}}}}}"
+    header, value = config.auth.header_name or "Authorization", auth_header_value(config)
     for step in case.setup:
         if not has_header(step, header):
             step.headers[header] = value

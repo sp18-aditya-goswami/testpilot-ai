@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from urllib.parse import urlencode
 
 import httpx
 
@@ -7,17 +8,20 @@ from backend import ai
 from backend.config import get_settings
 from backend.executor import BudgetExceeded, CaseContext, Executor, make_client
 from backend.findings import failure_digest, regression_test, rules_analysis
+from backend.auth_detect import find_token
 from backend.schemas import (
     Analysis,
     ApiSummary,
     CaseResult,
     Endpoint,
+    RequestSpec,
     Run,
     RunCounts,
     TestCase,
     TestPlan,
     utcnow,
 )
+from backend.workspace_schemas import AuthStep, LoginFlow
 from backend.engines.fuzz import run_fuzz
 from backend.store import NotFound, store
 from backend.validator import outcome_for, validate
@@ -57,6 +61,43 @@ async def _run_case(
     return result
 
 
+def _auth_request(step: AuthStep, ctx: CaseContext) -> RequestSpec:
+    if not step.form:
+        return RequestSpec(method=step.method, path=step.path, body=step.body)
+    rendered = ctx.render(step.body)
+    return RequestSpec(
+        method=step.method,
+        path=step.path,
+        raw_body=urlencode({k: "" if v is None else str(v) for k, v in rendered.items()}),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+
+
+async def sign_in(run: Run, executor: Executor, flow: LoginFlow, variables: dict[str, str]) -> str | None:
+    """Gets the run its own token: registers a fresh test user when the flow says so, then signs in."""
+    ctx = CaseContext(variables)
+    steps = [("Sign-up", flow.signup), ("Sign-in", flow.login)]
+    exchange = None
+    for label, step in steps:
+        if step is None:
+            continue
+        exchange = await executor.send(_auth_request(step, ctx), ctx)
+        run.auth_exchanges.append(exchange)
+        if exchange.status is None or exchange.status >= 400:
+            hint = " Check the test login in the plan's first step." if label == "Sign-in" and flow.signup is None else ""
+            run.auth_note = f"{label} failed: {step.endpoint_id} returned {exchange.status or exchange.error}, so no tests ran.{hint}"
+            return None
+    token = find_token(exchange.response_body if exchange else None, flow.token_field)
+    if not token:
+        run.auth_note = f"Signed in with {flow.login.endpoint_id}, but its response holds no token TestPilot recognises, so no tests ran."
+        return None
+    executor.secrets.add(token)
+    run.auth_exchanges = [executor._redact(e) for e in run.auth_exchanges]  # the token arrived in the last one
+    who = f"a new test user from {flow.signup.endpoint_id}" if flow.signup else "your test account"
+    run.auth_note = f"Signed in with {flow.login.endpoint_id} as {who} before the tests."
+    return token
+
+
 def _recount(run: Run) -> None:
     counts = RunCounts(total=len(run.cases))
     for r in run.results:
@@ -79,11 +120,12 @@ async def _analyze(run: Run, plan: TestPlan | None) -> None:
         return
 
     run.status = "analyzing"
+    groups: list[str] = []
     for start in range(0, len(failed), ANALYSIS_BATCH):
         batch = failed[start : start + ANALYSIS_BATCH]
         digests = [failure_digest(by_id[r.case_id], r) for r in batch]
         try:
-            findings = await asyncio.to_thread(ai.analyze_failures, digests, plan.business_rules if plan else "")
+            findings = await asyncio.to_thread(ai.analyze_failures, digests, plan.business_rules if plan else "", list(groups))
         except ai.AiUnavailable as exc:
             run.message = f"AI analysis unavailable ({exc}); showing rule-based explanations."
             return
@@ -98,7 +140,10 @@ async def _analyze(run: Run, plan: TestPlan | None) -> None:
                     likely_cause=f.likely_cause,
                     investigation_steps=f.investigation_steps,
                     source="ai",
+                    cause_group=f.cause_group.strip()[:80],
                 )
+                if r.analysis.cause_group and r.analysis.cause_group not in groups:
+                    groups.append(r.analysis.cause_group)
 
 
 async def _fuzz(run: Run, api: ApiSummary, max_examples: int) -> None:
@@ -163,6 +208,8 @@ async def execute_run(
     *,
     variables: dict[str, str] | None = None,
     secrets: set[str] | None = None,
+    login: LoginFlow | None = None,
+    token_variable: str = "token",
 ) -> None:
     """Runs every case in `run`. Without `api` (saved-request runs) there is no contract to check against."""
     settings = get_settings()
@@ -174,6 +221,14 @@ async def execute_run(
         limits = httpx.Limits(max_connections=settings.max_concurrency)
         async with make_client(timeout=settings.request_timeout_s, limits=limits, follow_redirects=False) as client:
             executor = Executor(client, run.base_url, settings.max_requests_per_run, secrets=secrets)
+            if login is not None:
+                token = await sign_in(run, executor, login, variables or {})
+                if token is None:
+                    run.status = "failed"
+                    run.message = run.auth_note
+                    run.request_count = executor.sent
+                    return
+                variables = {**(variables or {}), token_variable: token}
             semaphore = asyncio.Semaphore(settings.max_concurrency)
 
             async def one(case: TestCase) -> None:
