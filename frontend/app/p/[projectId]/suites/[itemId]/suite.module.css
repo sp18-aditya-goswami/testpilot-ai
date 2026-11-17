@@ -43,43 +43,10 @@
 .sourceTop { justify-content: space-between; }
 .existingMeta { font-size: var(--text-sm); color: var(--color-muted); white-space: nowrap; }
 
-/* planner sections */
-.sections { display: grid; gap: var(--space-md); }
-.section { padding: var(--space-lg); display: grid; gap: var(--space-md); min-width: 0; }
-.sectionHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; }
-.sectionHead h3 { font-size: var(--text-lg); }
-.sectionHelp { font-size: var(--text-sm); color: var(--color-muted); margin-top: var(--space-3xs); max-width: 62ch; }
-.sectionActions { display: flex; gap: var(--space-2xs); flex-wrap: wrap; }
-.twoCol { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-md) var(--space-lg); }
 
-.objectives { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: var(--space-xl); }
-.objectives li { border-top: var(--rule-hair) solid var(--color-rule); padding-block: var(--space-sm); }
-.objectiveLabel { display: grid; gap: var(--space-3xs); }
-.objectiveHint { font-size: var(--text-sm); color: var(--color-muted); }
 
-.depthNote { font-size: var(--text-sm); color: var(--color-ink-2); }
-.depthNote b { font-variant-numeric: tabular-nums; }
 
-/* rules */
-.rules { list-style: none; margin: 0; padding: 0; display: grid; }
-.rule { display: grid; gap: var(--space-sm); padding-block: var(--space-md); border-top: var(--rule-hair) solid var(--color-rule); }
-.rule:first-child { border-top: 0; padding-top: 0; }
-.ruleRow { display: grid; grid-template-columns: minmax(0, 1fr) 9rem; gap: var(--space-md); align-items: start; }
-.ruleFoot { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; }
-.scope summary { cursor: pointer; font-size: var(--text-sm); color: var(--color-ink-2); width: fit-content; border-radius: var(--radius-card); }
-.scope summary:hover { color: var(--color-ink); }
-.scope summary:active { color: var(--color-ink); }
-.scope summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
-.scopeList { list-style: none; margin: var(--space-xs) 0 0; padding: 0; display: grid; gap: var(--space-2xs); }
-.emptyRules { font-size: var(--text-sm); color: var(--color-muted); }
 
-.engines { display: grid; gap: var(--space-sm); }
-.engineHint { display: block; font-size: var(--text-sm); color: var(--color-muted); }
-.checkDisabled { cursor: not-allowed; }
-.checkDisabled > span { opacity: 0.55; }
-.settingsLink { color: var(--color-ink); text-decoration: underline; text-decoration-color: var(--color-rule-2); text-underline-offset: 0.2em; }
-.settingsLink:hover { text-decoration-color: var(--color-accent); }
-.settingsLink:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 
 /* the footer bar */
 .bar { position: sticky; bottom: 0; z-index: var(--z-sticky); background: var(--color-paper-2); border-top: var(--rule-hair) solid var(--color-rule-2); padding: var(--space-sm) var(--space-lg); margin-top: var(--space-xl); }
@@ -94,12 +61,8 @@
 .skeletonTitle { max-width: 22rem; min-height: 2.4rem; margin-bottom: var(--space-xl); }
 .skeletonBlock { min-height: 12rem; }
 
-@media (max-width: 60rem) {
-  .twoCol, .objectives { grid-template-columns: minmax(0, 1fr); }
-  .ruleRow { grid-template-columns: minmax(0, 1fr); }
-}
 @media (max-width: 40rem) {
-  .source, .section { padding: var(--space-md); }
+  .source { padding: var(--space-md); }
   .sourceRow { grid-template-columns: minmax(0, 1fr); }
   .bar { position: static; padding: var(--space-md); }
   .barAction { justify-items: start; }
@@ -108,7 +71,6 @@
 }
 @media (prefers-reduced-motion: reduce) { .existingButton:active:not(:disabled) { transform: none; } }
 
-.legend { display: grid; gap: var(--space-sm); margin-top: var(--space-lg); padding-top: var(--space-md); border-top: var(--rule-hair) solid var(--color-rule); }
 .history { display: grid; gap: var(--space-md); }
 .historyHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; }
 .historyHead h2 { font-size: var(--text-2xl); text-wrap: balance; }

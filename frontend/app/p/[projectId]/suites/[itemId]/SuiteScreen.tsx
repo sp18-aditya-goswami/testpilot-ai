@@ -11,7 +11,7 @@ import { Steps } from "@/components/Steps";
 import { Icon } from "@/components/Icon";
 import { useProject } from "@/components/ProjectContext";
 import { EndpointLedger } from "@/app/_new-test/EndpointLedger";
-import { PlannerSections } from "./PlannerSections";
+import { PlannerSections } from "@/components/planner/PlannerSections";
 import { SpecSource } from "./SpecSource";
 import { SuiteHistory } from "./SuiteHistory";
 import styles from "./suite.module.css";

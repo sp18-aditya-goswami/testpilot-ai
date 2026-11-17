@@ -5,19 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useMemo, useState } from "react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Icon } from "@/components/Icon";
-import { MethodPath } from "@/components/Status";
+import { PlannerSections } from "@/components/planner/PlannerSections";
 import { Steps } from "@/components/Steps";
 import { api, errorMessage, type ApiSummary } from "@/lib/api";
 import { flowHref, testPlans, type AccessStatus } from "@/lib/testplans";
-import { DEFAULT_PLANNER_CONFIG, OBJECTIVES, ws, type BusinessRule, type Depth, type Item, type Objective, type PlannerConfig } from "@/lib/workspace";
+import { DEFAULT_PLANNER_CONFIG, ws, type Item, type PlannerConfig } from "@/lib/workspace";
 import { AccessForm, authFor } from "./AccessForm";
 import styles from "./new-plan.module.css";
-
-const DEPTH: { id: Depth; label: string; hint: string }[] = [
-  { id: "quick", label: "Quick", hint: "about 3 AI cases per endpoint" },
-  { id: "standard", label: "Standard", hint: "about 6 AI cases per endpoint" },
-  { id: "thorough", label: "Thorough", hint: "about 12 AI cases per endpoint" },
-];
 
 /** What step 1 settled: the API under test and where it runs. */
 interface Target {
@@ -39,27 +33,13 @@ function originOf(url: string): string | null {
   }
 }
 
-/** One rule per line. A three-digit code in the line is what a violation must return; scoping set elsewhere is kept. */
-function rulesFromText(text: string, previous: BusinessRule[]): BusinessRule[] {
-  return text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const kept = previous.find((r) => r.text === line);
-      if (kept) return kept;
-      const codes = Array.from(new Set((line.match(/\b[1-5]\d\d\b/g) ?? []).map(Number)));
-      return { text: line.slice(0, 500), endpoint_ids: [], expected_status: codes };
-    });
-}
-
 export function NewPlanFlow() {
   const router = useRouter();
   const params = useSearchParams();
   const suiteParam = params.get("suite");
   const projectParam = params.get("project");
   const specParam = params.get("spec");
-  const ids = { spec: useId(), paste: useId(), base: useId(), name: useId(), rules: useId(), instruction: useId(), data: useId(), exclusions: useId(), auth: useId() };
+  const ids = { spec: useId(), paste: useId(), base: useId(), name: useId() };
 
   const [step, setStep] = useState<1 | 2>(suiteParam || specParam ? 2 : 1);
   const [loading, setLoading] = useState(!!(suiteParam || specParam));
@@ -78,7 +58,6 @@ export function NewPlanFlow() {
   const [target, setTarget] = useState<Target | null>(null);
   const [suite, setSuite] = useState<Item | null>(null);
   const [config, setConfig] = useState<PlannerConfig>(DEFAULT_PLANNER_CONFIG);
-  const [rulesText, setRulesText] = useState("");
   const [name, setName] = useState("");
 
   const [busy, setBusy] = useState(false);
@@ -108,7 +87,6 @@ export function NewPlanFlow() {
           const cfg = { ...DEFAULT_PLANNER_CONFIG, ...item.suite.config };
           setSuite(item);
           setConfig(cfg);
-          setRulesText(cfg.business_rules.map((r) => r.text).join("\n"));
           setName(item.name);
           setTarget({
             projectId: item.project_id,
@@ -199,11 +177,11 @@ export function NewPlanFlow() {
     const useAi = config.use_ai && !aiOff;
     if (!useAi && !config.use_contract) return setError("Turn on at least one source of test cases under More options.");
     if (useAi && config.objectives.length === 0) return setError("Pick at least one thing for the AI to focus on.");
-    if (selected.size === 0) return setError("Choose at least one endpoint to test under More options.");
+    if (selected.size === 0) return setError("Choose at least one endpoint to test in section 1.");
     const finalConfig: PlannerConfig = {
       ...config,
       use_ai: useAi,
-      business_rules: rulesFromText(rulesText, config.business_rules),
+      business_rules: config.business_rules.filter((r) => r.text.trim()).map((r) => ({ ...r, text: r.text.trim() })),
       auth: authFor(config.auth, target.access),
     };
     const planName = name.trim() || `${target.api.title} test plan`;
@@ -222,19 +200,6 @@ export function NewPlanFlow() {
       setBusy(false);
     }
   }
-
-  const toggleObjective = (id: Objective) => {
-    const next = new Set(config.objectives);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    patch({ objectives: OBJECTIVES.map((o) => o.id).filter((o) => next.has(o)) });
-  };
-  const toggleEndpoint = (id: string) => {
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    patch({ focus_endpoints: next.size === endpoints.length ? [] : endpoints.map((e) => e.id).filter((x) => next.has(x)) });
-  };
 
   const crumbs = [{ label: "Test plans", href: flowHref.list }, { label: suite ? suite.name : "New test plan" }];
   const editing = !!suite;
@@ -399,13 +364,31 @@ export function NewPlanFlow() {
 
   if (!target) return null;
 
+  const a = target.access?.auth;
+  const authNote =
+    a?.mode === "auto"
+      ? `Each run signs itself in: a new test user from ${a.register_endpoint}, then ${a.login_endpoint}. Nothing to enter.`
+      : a?.mode === "credentials"
+        ? target.access?.has_login
+          ? `Each run signs in with ${a.login_endpoint} using your test login.`
+          : `Each run signs in with ${a.login_endpoint}; no test login is saved yet, so runs will stop at sign-in.`
+        : a?.mode === "token"
+          ? target.access?.has_token
+            ? `Your token is sent in the ${a.header_name} header.`
+            : "This API needs a token and none is saved yet, so protected endpoints will fail."
+          : undefined;
+  const scopeCount = selected.size;
+  const perEndpoint = { quick: 3, standard: 6, thorough: 12 }[config.depth];
+  const useAi = config.use_ai && !aiOff;
+  const estimate = useAi ? `About ${perEndpoint * scopeCount} AI cases${config.use_contract ? " plus schema cases" : ""}.` : config.use_contract ? "Schema cases only." : "No case source chosen.";
+
   return (
     <>
       <Breadcrumbs items={crumbs} />
       <Steps current={2} hrefs={stepHrefs} />
       <div className={styles.head}>
-        <h1>{editing ? "Change what to test" : "What should the AI focus on?"}</h1>
-        <p>The defaults are good. Business rules make the biggest difference: they are what the schema cannot say.</p>
+        <h1>{editing ? "Change what to test" : "What should the AI test?"}</h1>
+        <p>Sections 1 to 6 shape the plan. The defaults are good; business rules make the biggest difference.</p>
       </div>
 
       <div className={`panel ${styles.target}`}>
@@ -438,162 +421,32 @@ export function NewPlanFlow() {
       )}
 
       <form className={styles.form} onSubmit={buildPlan} noValidate>
-        <section className={`panel ${styles.card}`} aria-labelledby="focus-title">
-          <div className={styles.blockHead}>
-            <h2 id="focus-title" className={styles.cardTitle}>
-              Focus
-            </h2>
-            <button type="button" className="key key--plain" onClick={() => patch({ objectives: OBJECTIVES.map((o) => o.id) })}>
-              Select all
-            </button>
-          </div>
-          <ul className={styles.chips} aria-label="What the AI should test">
-            {OBJECTIVES.map((o) => (
-              <li key={o.id}>
-                <button type="button" className={styles.chip} aria-pressed={config.objectives.includes(o.id)} title={o.hint} onClick={() => toggleObjective(o.id)} disabled={aiOff}>
-                  {config.objectives.includes(o.id) && <Icon name="check" size={12} />}
-                  {o.label}
+        <PlannerSections config={config} onChange={patch} endpoints={endpoints} showEndpoints aiEnabled={aiEnabled} authNote={authNote} />
+
+        <div className={styles.bar}>
+          <div className={styles.barInner}>
+            <div className={`field ${styles.barName}`}>
+              <label htmlFor={ids.name}>Plan name</label>
+              <input id={ids.name} name="name" className="input" autoComplete="off" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <p className={`small ${error ? "helper is-error" : "muted"} ${styles.barNote}`} role={error ? "alert" : undefined}>
+              {error ?? `${estimate} You review every case before anything runs.`}
+            </p>
+            <div className={styles.actions}>
+              {!editing && !(projectParam && specParam) ? (
+                <button type="button" className="key" disabled={busy} onClick={() => setStep(1)}>
+                  Back
                 </button>
-              </li>
-            ))}
-          </ul>
-
-          <div className={styles.depth}>
-            <span className="label" id="depth-label">
-              Depth
-            </span>
-            <div className="tray" role="group" aria-labelledby="depth-label">
-              {DEPTH.map((d) => (
-                <button key={d.id} type="button" aria-pressed={config.depth === d.id} onClick={() => patch({ depth: d.id })} disabled={aiOff}>
-                  {d.label}
+              ) : (
+                <button type="button" className="key" disabled={busy} onClick={() => router.back()}>
+                  Back
                 </button>
-              ))}
-            </div>
-            <span className="muted small">{DEPTH.find((d) => d.id === config.depth)?.hint}</span>
-          </div>
-        </section>
-
-        <section className={`panel ${styles.card}`} aria-labelledby="rules-title">
-          <h2 id="rules-title" className={styles.cardTitle}>
-            Business rules
-          </h2>
-          <div className="field">
-            <label htmlFor={ids.rules}>One rule per line. Put the status a violation must return in the line if you know it.</label>
-            <textarea
-              id={ids.rules}
-              name="business_rules"
-              className="input"
-              rows={4}
-              placeholder={"Email must be unique, a duplicate returns 409\nPassword needs at least 8 characters, otherwise 422"}
-              value={rulesText}
-              onChange={(e) => setRulesText(e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor={ids.instruction}>Anything else the AI should know (optional)</label>
-            <textarea
-              id={ids.instruction}
-              name="instruction"
-              className="input"
-              rows={2}
-              maxLength={4000}
-              placeholder="Focus on registration and profile updates"
-              value={config.instruction}
-              onChange={(e) => patch({ instruction: e.target.value })}
-            />
-          </div>
-        </section>
-
-        <details className={`panel ${styles.more}`}>
-          <summary>
-            <span>More options</span>
-            <span className="muted small">endpoints, auth, test data, exclusions, case sources</span>
-          </summary>
-          <div className={styles.moreBody}>
-            <fieldset className={styles.fieldset}>
-              <legend className="label">
-                Endpoints to test ({selected.size} of {endpoints.length})
-              </legend>
-              <ul className={styles.endpoints}>
-                {endpoints.map((ep) => (
-                  <li key={ep.id}>
-                    <label className="check">
-                      <input type="checkbox" name="focus_endpoints" value={ep.id} checked={selected.has(ep.id)} onChange={() => toggleEndpoint(ep.id)} />
-                      <span className={styles.endpointLabel}>
-                        <MethodPath id={ep.id} />
-                        {ep.summary && <span className="muted small">{ep.summary}</span>}
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </fieldset>
-
-            <div className="field">
-              <label htmlFor={ids.auth}>How auth works (optional)</label>
-              <textarea
-                id={ids.auth}
-                name="auth_description"
-                className="input"
-                rows={2}
-                maxLength={1000}
-                placeholder="Bearer token. Admins can delete users; members can only edit themselves"
-                value={config.auth.description}
-                onChange={(e) => patch({ auth: { ...config.auth, description: e.target.value } })}
-              />
-            </div>
-            <div className={styles.twoCol}>
-              <div className="field">
-                <label htmlFor={ids.data}>Known test data (optional)</label>
-                <textarea id={ids.data} name="test_data" className="input" rows={3} maxLength={4000} placeholder="User 1 exists with email admin@example.com" value={config.test_data} onChange={(e) => patch({ test_data: e.target.value })} />
-              </div>
-              <div className="field">
-                <label htmlFor={ids.exclusions}>Never send or test (optional)</label>
-                <textarea id={ids.exclusions} name="exclusions" className="input" rows={3} maxLength={2000} placeholder="Skip the /admin endpoints" value={config.exclusions} onChange={(e) => patch({ exclusions: e.target.value })} />
-              </div>
-            </div>
-
-            <fieldset className={styles.fieldset}>
-              <legend className="label">Where cases come from</legend>
-              <label className="check">
-                <input type="checkbox" name="use_ai" checked={config.use_ai && !aiOff} disabled={aiOff} onChange={(e) => patch({ use_ai: e.target.checked })} />
-                <span>AI cases, planned from your focus and rules</span>
-              </label>
-              <label className="check">
-                <input type="checkbox" name="review_pass" checked={config.review_pass && config.use_ai && !aiOff} disabled={aiOff || !config.use_ai} onChange={(e) => patch({ review_pass: e.target.checked })} />
-                <span>AI reviews its own plan before you see it</span>
-              </label>
-              <label className="check">
-                <input type="checkbox" name="use_contract" checked={config.use_contract} onChange={(e) => patch({ use_contract: e.target.checked })} />
-                <span>Schema cases, derived from the spec by TestPilot</span>
-              </label>
-            </fieldset>
-          </div>
-        </details>
-
-        <div className={`panel ${styles.card} ${styles.finish}`}>
-          <div className="field">
-            <label htmlFor={ids.name}>Plan name</label>
-            <input id={ids.name} name="name" className="input" autoComplete="off" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <p className={`helper ${error ? "is-error" : ""}`} role={error ? "alert" : undefined}>
-            {error ?? ""}
-          </p>
-          <div className={styles.actions}>
-            <button type="submit" className="key key--primary" disabled={busy} aria-busy={busy}>
-              {busy && <span className="spinner" aria-hidden="true" />}
-              {busy ? "Starting" : editing ? "Build a new version of the plan" : "Build the plan"}
-            </button>
-            {!editing && !(projectParam && specParam) ? (
-              <button type="button" className="key" disabled={busy} onClick={() => setStep(1)}>
-                Back
+              )}
+              <button type="submit" className="key key--primary" disabled={busy} aria-busy={busy}>
+                {busy && <span className="spinner" aria-hidden="true" />}
+                {busy ? "Starting" : editing ? "Build a new version" : "Build the plan"}
               </button>
-            ) : (
-              <button type="button" className="key" disabled={busy} onClick={() => router.back()}>
-                Back
-              </button>
-            )}
-            <span className="muted small">Takes a minute or two. You review every case before anything runs.</span>
+            </div>
           </div>
         </div>
       </form>
