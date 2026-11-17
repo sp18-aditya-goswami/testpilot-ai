@@ -239,7 +239,7 @@ export function SuiteScreen({ projectId, itemId }: { projectId: string; itemId: 
     return (
       <>
         <Breadcrumbs items={trail} />
-        <Steps current={1} />
+        <Steps current={2} />
         <div className="error-state" role="alert">
           <h3>Could not open this suite</h3>
           <p>{loadError}</p>
@@ -255,7 +255,7 @@ export function SuiteScreen({ projectId, itemId }: { projectId: string; itemId: 
     return (
       <>
         <Breadcrumbs items={trail} />
-        <Steps current={1} />
+        <Steps current={2} />
         <p className="visually-hidden" role="status">
           Loading suite
         </p>
@@ -271,7 +271,13 @@ export function SuiteScreen({ projectId, itemId }: { projectId: string; itemId: 
   return (
     <>
       <Breadcrumbs items={trail} />
-      <Steps current={1} planHref={suite.last_plan_id ? `/p/${pid}/plans/${encodeURIComponent(suite.last_plan_id)}` : undefined} />
+      <Steps
+        current={2}
+        hrefs={{
+          3: suite.last_plan_id ? `/p/${pid}/plans/${encodeURIComponent(suite.last_plan_id)}` : undefined,
+          4: suite.last_run_id ? `/p/${pid}/runs/${encodeURIComponent(suite.last_run_id)}` : undefined,
+        }}
+      />
 
       <div className={styles.head}>
         <div className={styles.nameField}>
@@ -444,7 +450,7 @@ export function SuiteScreen({ projectId, itemId }: { projectId: string; itemId: 
               Generate test plan
             </button>
             <p id="generate-help" className={`helper${generateError ? " is-error" : ""}`} role={generateError ? "alert" : undefined}>
-              {generateError ?? blocked ?? (aiActive ? "Claude plans in the background; you can watch its progress." : "Contract cases only.")}
+              {generateError ?? blocked ?? (aiActive ? "AI plans in the background; you can watch its progress." : "Contract cases only.")}
             </p>
           </div>
         </div>

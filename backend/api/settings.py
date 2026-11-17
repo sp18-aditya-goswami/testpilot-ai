@@ -10,6 +10,7 @@ router = APIRouter()
 
 HOSTNAME = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")
 AWS_REGION = re.compile(r"^[a-z]{2}(-[a-z]+)+-\d$")
+AWS_PROFILE = re.compile(r"^[A-Za-z0-9_.@+-]{1,64}$")
 MODEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{1,199}$")
 SECRET_FIELDS = ("anthropic_api_key", "openai_api_key", "aws_access_key_id", "aws_secret_access_key", "aws_session_token", "bedrock_api_key")
 
@@ -39,7 +40,7 @@ def _settings_out() -> SettingsOut:
             bedrock=BedrockSettings(
                 region=s.aws_region,
                 auth=bedrock_auth,
-                profile=s.aws_profile,
+                profile=s.aws_profile if s.aws_profile and AWS_PROFILE.match(s.aws_profile) else None,  # never echo a key pasted here
                 access_key_hint=_access_key_hint(s.aws_access_key_id),
                 has_secret_key=bool(s.aws_secret_access_key),
                 has_session_token=bool(s.aws_session_token),
@@ -104,6 +105,11 @@ def update_app_settings(body: SettingsPatch):
             current.pop("aws_region", None)
     if body.aws_profile is not None:
         profile = body.aws_profile.strip()
+        if profile and not AWS_PROFILE.match(profile):
+            raise HTTPException(
+                status_code=422,
+                detail="The AWS profile is a short name from ~/.aws/config, such as default. A key belongs in the Bedrock API key or access key fields.",
+            )
         if profile:
             current["aws_profile"] = profile
         else:

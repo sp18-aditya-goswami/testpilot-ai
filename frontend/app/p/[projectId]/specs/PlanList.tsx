@@ -35,7 +35,7 @@ export function RunResult({ run }: { run: RunListItem }) {
 
 /**
  * Plans, newest first. `suiteName` adds a column naming each plan's suite (the spec page lists plans from several);
- * `result` shows the run of that plan when one is known. "From Claude" appears only when some plan has AI cases.
+ * `result` shows the run of that plan when one is known. "From AI" appears only when some plan has AI cases.
  */
 export function PlanList({
   projectId,
@@ -58,7 +58,7 @@ export function PlanList({
               <th>{suiteName ? "Suite" : "Plan"}</th>
               {suiteName && <th>Planned</th>}
               <th className="num">Cases</th>
-              {anyAi && <th className="num">From Claude</th>}
+              {anyAi && <th className="num">From AI</th>}
               <th>Status</th>
               {result && <th>Latest run</th>}
             </tr>

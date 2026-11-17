@@ -3,6 +3,7 @@ import os
 import stat
 from types import SimpleNamespace
 
+import anthropic
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
@@ -95,3 +96,25 @@ def test_not_ready_provider_raises_clear_message(client):
     client.put("/api/settings", json={"ai_provider": "openai", "openai_api_key": ""})
     with pytest.raises(ai_auth.AiUnavailable, match="OpenAI API key"):
         ai_auth.call_structured("s", "u", Answer)
+
+
+def test_bedrock_catalog_ids_use_the_runtime_client(client):
+    client.put("/api/settings", json={"ai_provider": "bedrock", "aws_region": "ap-south-1", "bedrock_auth": "api_key", "bedrock_api_key": "bedrock-api-key-123456789"})
+    assert not ai_auth.bedrock_uses_runtime("anthropic.claude-opus-5-5")
+    for model in ("apac.anthropic.claude-sonnet-4-5-20250929-v1:0", "anthropic.claude-3-5-sonnet-20241022-v2:0", "global.anthropic.claude-opus-4-8", "arn:aws:bedrock:ap-south-1:1:inference-profile/x"):
+        assert ai_auth.bedrock_uses_runtime(model), model
+    client.put("/api/settings", json={"bedrock_model": "apac.anthropic.claude-sonnet-4-5-20250929-v1:0"})
+    s = ai_auth.get_settings()
+    assert isinstance(ai_auth._bedrock_client(s, 5.0, 0), anthropic.AnthropicBedrock)
+    assert ai_auth._bedrock_extra(s) == {}
+    client.put("/api/settings", json={"bedrock_model": "anthropic.claude-opus-5-5"})
+    s = ai_auth.get_settings()
+    assert isinstance(ai_auth._bedrock_client(s, 5.0, 0), anthropic.AnthropicBedrockMantle)
+    assert ai_auth._bedrock_extra(s) == {"output_config": {"effort": s.effort}}
+
+
+def test_aws_profile_rejects_a_pasted_key(client):
+    r = client.put("/api/settings", json={"aws_profile": "ABSK" + "x" * 100 + "="})
+    assert r.status_code == 422 and "short name" in r.json()["detail"]
+    assert client.put("/api/settings", json={"aws_profile": "work-sso"}).json()["ai"]["bedrock"]["profile"] == "work-sso"
+    client.put("/api/settings", json={"aws_profile": ""})

@@ -400,7 +400,7 @@ export function PlannerSections({
             />
             <span>
               AI scenarios <SourceTag source="ai" />
-              <span className={styles.engineHint}>AI-generated. Claude plans business-aware cases from everything above, and TestPilot validates each one.</span>
+              <span className={styles.engineHint}>AI-generated. AI plans business-aware cases from everything above, and TestPilot validates each one.</span>
             </span>
           </label>
           <label className={`check${aiOff || !config.use_ai ? ` ${styles.checkDisabled}` : ""}`}>
@@ -413,7 +413,7 @@ export function PlannerSections({
             />
             <span>
               Review pass
-              <span className={styles.engineHint}>Claude checks its own plan for gaps and wrong expectations before you see it.</span>
+              <span className={styles.engineHint}>The AI checks its own plan for gaps and wrong expectations before you see it.</span>
             </span>
           </label>
           {aiOff && (

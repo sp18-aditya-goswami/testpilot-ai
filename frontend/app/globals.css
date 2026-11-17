@@ -142,7 +142,7 @@ strong, b { font-weight: 500; color: var(--color-ink); }
 .steps li[data-state="done"] .step-num { box-shadow: none; background: var(--color-paper-3); color: var(--color-success); }
 .steps li[aria-current="step"] { color: var(--color-ink); font-weight: 400; }
 .steps li[aria-current="step"] .step-num { box-shadow: none; background: var(--color-accent); color: var(--color-accent-ink); }
-.steps a { color: inherit; text-decoration: none; border-radius: var(--radius-card); }
+.steps a { display: inline-flex; align-items: center; gap: var(--space-xs); color: inherit; text-decoration: none; border-radius: var(--radius-card); }
 @media (hover: hover) { .steps a:hover { color: var(--color-ink); text-decoration: underline; text-decoration-color: var(--color-accent); } }
 .steps a:active { color: var(--color-ink); }
 

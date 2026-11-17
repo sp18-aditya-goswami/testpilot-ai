@@ -1,5 +1,6 @@
 """The AI providers TestPilot can plan and explain with: the Anthropic API, OpenAI, or Claude on AWS Bedrock."""
 
+import re
 from typing import Any, Literal, TypeVar
 
 import anthropic
@@ -73,7 +74,17 @@ def _anthropic_client(s: Settings, timeout: float, max_retries: int) -> anthropi
     return anthropic.Anthropic(api_key=s.anthropic_api_key, timeout=timeout, max_retries=max_retries)
 
 
-def _bedrock_client(s: Settings, timeout: float, max_retries: int) -> anthropic.AnthropicBedrockMantle:
+# Catalog ids for the bedrock-runtime (InvokeModel) route: cross-region inference profiles such as
+# "apac.anthropic.claude-sonnet-4-5-20250929-v1:0", versioned ids ending in ":0", and ARNs.
+# Plain "anthropic.claude-…" ids go to Claude in Amazon Bedrock (the Mantle endpoint).
+_RUNTIME_MODEL_ID = re.compile(r"^arn:|:\d+$|^(us|eu|apac|jp|au|ca|global|us-gov)\.")
+
+
+def bedrock_uses_runtime(model: str) -> bool:
+    return bool(_RUNTIME_MODEL_ID.search(model.strip()))
+
+
+def _bedrock_client(s: Settings, timeout: float, max_retries: int) -> anthropic.AnthropicBedrockMantle | anthropic.AnthropicBedrock:
     kwargs: dict[str, Any] = {"aws_region": s.aws_region, "timeout": timeout, "max_retries": max_retries}
     if s.bedrock_auth == "keys":
         kwargs.update(aws_access_key=s.aws_access_key_id, aws_secret_key=s.aws_secret_access_key, aws_session_token=s.aws_session_token or None)
@@ -81,7 +92,14 @@ def _bedrock_client(s: Settings, timeout: float, max_retries: int) -> anthropic.
         kwargs["api_key"] = s.bedrock_api_key
     elif s.aws_profile:
         kwargs["aws_profile"] = s.aws_profile
+    if bedrock_uses_runtime(s.bedrock_model):
+        return anthropic.AnthropicBedrock(**kwargs)
     return anthropic.AnthropicBedrockMantle(**kwargs)
+
+
+def _bedrock_extra(s: Settings) -> dict[str, Any]:
+    """Effort is sent only on the Mantle route; older runtime models reject the field."""
+    return {} if bedrock_uses_runtime(s.bedrock_model) else {"output_config": {"effort": s.effort}}
 
 
 def _openai_client(s: Settings, timeout: float, max_retries: int) -> openai.OpenAI:
@@ -103,13 +121,18 @@ def _claude_result(response: Any, provider_name: str) -> Any:
     return response.parsed_output
 
 
-def _claude_errors(exc: Exception, provider_name: str) -> AiUnavailable:
+def _claude_errors(exc: Exception, provider_name: str, s: Settings | None = None) -> AiUnavailable:
     if isinstance(exc, anthropic.AuthenticationError):
         return AiUnavailable(f"{provider_name} rejected the credentials. Check Settings.")
     if isinstance(exc, anthropic.PermissionDeniedError):
         extra = " Enable access to this Claude model in the Bedrock console for your region." if provider_name == "AWS Bedrock" else ""
         return AiUnavailable(f"{provider_name} denied access to the model.{extra}")
     if isinstance(exc, anthropic.NotFoundError):
+        if provider_name == "AWS Bedrock" and s is not None:
+            return AiUnavailable(
+                f"AWS Bedrock in {s.aws_region} does not offer the model {s.bedrock_model}. Copy the model id or inference profile id "
+                "from the Bedrock console for that region, and check that model access is granted."
+            )
         return AiUnavailable(f"{provider_name} does not know this model id. Check the model in Settings.")
     if isinstance(exc, anthropic.RateLimitError):
         return AiUnavailable(f"Rate limited by {provider_name}; try again shortly")
@@ -162,7 +185,7 @@ def call_structured(system: str | list[dict[str, Any]], user: str, output_format
             response = _bedrock_client(s, 240.0, 2).messages.parse(
                 model=s.bedrock_model,
                 max_tokens=max_tokens,
-                output_config={"effort": s.effort},
+                **_bedrock_extra(s),
                 system=system,
                 messages=messages,
                 output_format=output_format,
@@ -179,7 +202,7 @@ def call_structured(system: str | list[dict[str, Any]], user: str, output_format
                 output_format=output_format,
             )
     except anthropic.AnthropicError as exc:
-        raise _claude_errors(exc, name) from exc
+        raise _claude_errors(exc, name, s) from exc
     return _claude_result(response, name)
 
 
@@ -198,7 +221,7 @@ def check_connection() -> tuple[bool, str]:
             _bedrock_client(s, 30.0, 0).messages.create(
                 model=model,
                 max_tokens=64,
-                output_config={"effort": "low"},
+                **({} if bedrock_uses_runtime(model) else {"output_config": {"effort": "low"}}),
                 messages=[{"role": "user", "content": "Reply with the word ready."}],
             )
         else:
@@ -212,7 +235,8 @@ def check_connection() -> tuple[bool, str]:
     except openai.APIConnectionError:
         return False, "Could not reach OpenAI."
     except anthropic.AnthropicError as exc:
-        return False, str(_claude_errors(exc, name))
+        return False, str(_claude_errors(exc, name, s))
     except Exception as exc:  # botocore credential and region errors on Bedrock
         return False, f"{name} could not be used: {exc}"
-    return True, f"{name} works. {model} is available."
+    where = f" in {s.aws_region}" if provider == "bedrock" else ""
+    return True, f"{name}{where} works. {model} answered."

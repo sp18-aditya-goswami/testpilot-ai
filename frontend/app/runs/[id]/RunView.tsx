@@ -8,9 +8,10 @@ import { Icon } from "@/components/Icon";
 import { itemTrail } from "@/components/itemTrail";
 import { OutcomeBar } from "@/components/OutcomeBar";
 import { useOptionalProject } from "@/components/ProjectContext";
-import { Steps } from "@/components/Steps";
+import { Steps, type StepNumber } from "@/components/Steps";
 import { api, errorMessage, type CaseResult, type Run } from "@/lib/api";
-import { ACTIVE, SOURCE_KIND_LABEL, STATUS_WORDS, formatDuration, formatStarted, planHref, runHref, runTitle, seconds } from "../format";
+import { flowHref } from "@/lib/testplans";
+import { ACTIVE, SOURCE_KIND_LABEL, STATUS_WORDS, formatDuration, formatStarted, isFlowPath, planHref, runHref, runTitle, seconds } from "../format";
 import styles from "../runs.module.css";
 import { CaseList, OUTCOME_FILTERS, SOURCE_FILTERS, type OutcomeFilter, type SourceFilter } from "./CaseList";
 import { Finding, SeverityText, findingId, groupAnchor, groupFindings, groupTitle, type FindingItem } from "./Finding";
@@ -67,7 +68,10 @@ export function RunView({ id }: { id: string }) {
   const [run, setRun] = useState<Run | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
+  const [rerunning, setRerunning] = useState(false);
+  const [rerunError, setRerunError] = useState<string | null>(null);
   const projectCtx = useOptionalProject();
+  const flow = isFlowPath(pathname);
 
   const load = useCallback(async () => {
     try {
@@ -101,9 +105,6 @@ export function RunView({ id }: { id: string }) {
   useNow(active);
 
   const projectId = run?.project_id ?? null;
-  useEffect(() => {
-    if (run?.project_id && !pathname.startsWith("/p/")) router.replace(runHref(run));
-  }, [run, pathname, router]);
 
   const resultsById = useMemo(() => {
     const m = new Map<string, CaseResult>();
@@ -165,15 +166,46 @@ export function RunView({ id }: { id: string }) {
     }
   };
 
+  const isSuite = run.source_kind === "suite";
+  /** The plan this run came from, in the flow or in the workspace. */
+  const planLink = isSuite && run.plan_id ? (flow ? flowHref.plan(run.plan_id) : planHref(run.plan_id, projectId)) : null;
+  const stepHrefs: Partial<Record<StepNumber, string>> = {};
+  if (planLink) stepHrefs[3] = planLink;
+  if (flow) {
+    if (run.source_id) stepHrefs[2] = flowHref.edit(run.source_id);
+  } else stepHrefs[2] = projectId && run.source_id ? `/p/${projectId}/suites/${run.source_id}` : projectId ? `/p/${projectId}` : "/workspace";
+
+  /** Run the same plan again with the same cases and options; fuzz findings are regenerated, not replayed. */
+  const runAgain = async () => {
+    if (!run.plan_id || rerunning) return;
+    setRerunning(true);
+    setRerunError(null);
+    try {
+      const next = await api.startRun(run.plan_id, {
+        case_ids: run.cases.filter((c) => c.source !== "fuzz").map((c) => c.id),
+        allow_destructive: run.allow_destructive,
+        fuzz: run.fuzz_status !== "off",
+        fuzz_examples: 20,
+      });
+      router.push(flow ? flowHref.run(next.id) : runHref(next));
+    } catch (err) {
+      setRerunError(errorMessage(err));
+      setRerunning(false);
+    }
+  };
+
   const tree = projectCtx?.tree ?? null;
   const crumbs: Crumb[] = [];
-  if (projectId && run.source_kind === "suite") {
+  if (flow) {
+    crumbs.push({ label: "Test plans", href: flowHref.list });
+    crumbs.push({ label: isSuite ? run.source_name || run.spec_title : runTitle(run), href: planLink ?? undefined });
+  } else if (projectId && run.source_kind === "suite") {
     crumbs.push(...itemTrail(tree, projectId, run.source_id, run.source_id ? `/p/${projectId}/suites/${run.source_id}` : undefined));
   } else if (projectId) {
     crumbs.push({ label: tree?.project.name ?? "Project", href: `/p/${projectId}` });
     if (run.source_name) crumbs.push({ label: run.source_name });
   }
-  if (run.source_kind === "suite" && run.plan_id) crumbs.push({ label: "Plan", href: planHref(run.plan_id, projectId) });
+  if (!flow && isSuite && run.plan_id) crumbs.push({ label: "Plan", href: planHref(run.plan_id, projectId) });
   crumbs.push({ label: `Run at ${shortTime(run.created_at)}` });
 
   const worst = findings[0];
@@ -205,13 +237,7 @@ export function RunView({ id }: { id: string }) {
   return (
     <>
       <Breadcrumbs items={crumbs} />
-      {run.source_kind === "suite" && (
-        <Steps
-          current={3}
-          planHref={run.plan_id ? planHref(run.plan_id, projectId) : undefined}
-          suiteHref={projectId && run.source_id ? `/p/${projectId}/suites/${run.source_id}` : projectId ? `/p/${projectId}` : "/"}
-        />
-      )}
+      {isSuite && <Steps current={4} hrefs={stepHrefs} />}
 
       <section className={`ticks ${styles.verdict}`} aria-label="Run result">
         <div className={styles.verdictMain}>
@@ -259,6 +285,17 @@ export function RunView({ id }: { id: string }) {
             </div>
           </dl>
           <div className={styles.actions}>
+            {planLink && (
+              <button type="button" className="key" onClick={runAgain} disabled={active || rerunning} aria-busy={rerunning || undefined}>
+                {rerunning ? <span className="spinner keep-motion" aria-hidden="true" /> : <Icon name="play" />}
+                {rerunning ? "Starting run" : "Run again"}
+              </button>
+            )}
+            {planLink && (
+              <Link className="key" href={planLink}>
+                Back to the plan
+              </Link>
+            )}
             <a className="key" href={api.reportHtmlUrl(run.id)} target="_blank" rel="noopener noreferrer">
               HTML report
               <Icon name="external" />
@@ -268,6 +305,11 @@ export function RunView({ id }: { id: string }) {
               JSON
             </a>
           </div>
+          {rerunError && (
+            <p className="helper is-error" role="alert">
+              {rerunError}
+            </p>
+          )}
         </div>
       </section>
 
@@ -283,9 +325,15 @@ export function RunView({ id }: { id: string }) {
           <div className="empty">
             <h3>This run has no cases</h3>
             <p>Nothing was selected when it started, so there is nothing to report.</p>
-            <Link className="key" href={projectId ? `/p/${projectId}` : "/"}>
-              {projectId ? "Back to the project" : "Open projects"}
-            </Link>
+            {flow ? (
+              <Link className="key" href={planLink ?? flowHref.list}>
+                {planLink ? "Back to the plan" : "Open test plans"}
+              </Link>
+            ) : (
+              <Link className="key" href={projectId ? `/p/${projectId}` : "/workspace"}>
+                {projectId ? "Back to the project" : "Open projects"}
+              </Link>
+            )}
           </div>
         </section>
       ) : (

@@ -1,0 +1,11 @@
+/* Hallmark · module: test plans list · system and stamp in app/globals.css */
+
+.skeleton { display: grid; gap: var(--space-sm); }
+.skeleton :global(.skeleton) { height: 56px; }
+.empty { max-width: 44rem; }
+.name { display: block; color: var(--color-ink); font-weight: 400; text-decoration: none; border-radius: var(--radius-card); }
+@media (hover: hover) { .name:hover { text-decoration: underline; text-decoration-color: var(--color-accent); } }
+.name:active { color: var(--color-ink); }
+.name:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.api { display: block; font-size: var(--text-sm); color: var(--color-muted); }
+.ai { color: var(--color-ai); }

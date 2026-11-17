@@ -200,7 +200,7 @@ export default function ProjectOverview() {
         onClose={() => setDeleting(false)}
         onConfirm={async () => {
           await ws.deleteProject(projectId);
-          router.push("/");
+          router.push("/workspace");
         }}
       >
         <p>This cannot be undone. Everything in the project goes, including its run history.</p>

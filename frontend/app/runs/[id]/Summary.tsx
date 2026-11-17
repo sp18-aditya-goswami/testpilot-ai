@@ -94,7 +94,7 @@ export function Summary({
 }) {
   const rows = sourceRows(run, results);
   const failedResults = [...results.values()].filter((r) => r.outcome === "failed");
-  const byClaude = failedResults.filter((r) => r.analysis?.source === "ai").length;
+  const byAi = failedResults.filter((r) => r.analysis?.source === "ai").length;
   const byRules = failedResults.filter((r) => r.analysis && r.analysis.source !== "ai").length;
   const counts = Object.fromEntries(rows.map((r) => [r.source, r.cases])) as Partial<Record<Source, number>>;
 
@@ -150,10 +150,10 @@ export function Summary({
           <h3>How failures were explained</h3>
           {failedResults.length > 0 && (
             <p className={styles.explainLine}>
-              {byClaude > 0 && (
+              {byAi > 0 && (
                 <span>
                   <ExplainedBy source="ai" />
-                  <span className={styles.explainCount}>{plural(byClaude, "failure")}</span>
+                  <span className={styles.explainCount}>{plural(byAi, "failure")}</span>
                 </span>
               )}
               {byRules > 0 && (
@@ -164,8 +164,8 @@ export function Summary({
               )}
             </p>
           )}
-          {byRules > 0 && byClaude === 0 && (
-            <p className="small muted">Turn on AI in Settings and Claude explains each failure from the request, the response and your rules.</p>
+          {byRules > 0 && byAi === 0 && (
+            <p className="small muted">Turn on AI in Settings and AI explains each failure from the request, the response and your rules.</p>
           )}
           {fuzzLine && (
             <p className={styles.runNote}>

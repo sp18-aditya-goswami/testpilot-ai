@@ -56,3 +56,8 @@ export function runTitle(r: RunRef): string {
 export function planHref(planId: string, projectId: string | null | undefined): string {
   return projectId ? `/p/${projectId}/plans/${planId}` : `/plans/${planId}`;
 }
+
+/** True in the AI test plan flow (`/plans/…`, `/runs/…`), false in the workspace (`/p/…`). Plan and run screens render in both. */
+export function isFlowPath(pathname: string): boolean {
+  return !pathname.startsWith("/p/");
+}

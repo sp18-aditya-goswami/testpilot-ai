@@ -318,7 +318,7 @@ async def _plan(plan: TestPlan, api: ApiSummary, config: PlannerConfig, variable
 
     if config.use_ai and not ai_enabled():
         plan.ai_status = "disabled"
-        plan.ai_message = "Set an Anthropic API key in Settings to plan AI scenarios."
+        plan.ai_message = "Set up an AI provider in Settings to plan AI scenarios."
     elif config.use_ai:
         context = build_context(endpoints, config, sorted(variable_keys))
         target = DEPTH_TARGET[config.depth]
@@ -347,10 +347,11 @@ async def _plan(plan: TestPlan, api: ApiSummary, config: PlannerConfig, variable
 
         if failures == len(endpoints):
             plan.ai_status = "error"
-            plan.ai_message = "Claude could not plan any endpoint; see the progress log."
+            reason = next((line.split(": ", 1)[1] for line in reversed(plan.progress) if line.startswith("Could not plan") and ": " in line), "")
+            plan.ai_message = f"The AI could not plan any endpoint. {reason}".strip()
         else:
             plan.ai_status = "ok"
-            plan.ai_message = f"Claude planned {len(ai_cases)} scenarios across {len(endpoints)} endpoints"
+            plan.ai_message = f"AI planned {len(ai_cases)} scenarios across {len(endpoints)} endpoints"
             if plan.rejected:
                 plan.ai_message += f"; {len(plan.rejected)} rejected by validation"
 

@@ -118,6 +118,10 @@ async def create_plan(body: PlanCreate):
         config=config.model_dump(),
     )
     planner.save(plan)
+    if body.suite_item_id:
+        from backend.api.testplans import record_suite
+
+        record_suite(body.suite_item_id, last_plan_id=plan.id)
     snapshot = plan.model_copy(deep=True)
     spawn(planner.run_planning(plan, api, config, sorted(runtime.variables)))
     return snapshot
@@ -169,7 +173,7 @@ async def refine_plan(plan_id: str, body: PlanRefine):
     plan = get_plan_or_404(plan_id)
     editable(plan)
     if not planner.ai_enabled():
-        raise HTTPException(status_code=422, detail="Set an Anthropic API key in Settings to refine plans with AI")
+        raise HTTPException(status_code=422, detail="Set up an AI provider in Settings to refine plans with AI")
     api = load_api(plan.spec_id)
     known = {e.id for e in api.endpoints}
     unknown = [e for e in body.endpoint_ids if e not in known]
@@ -240,6 +244,10 @@ async def start_run(plan_id: str, body: RunRequest):
     )
     active_runs[run.id] = run
     store.save("runs", run.id, run, project_id=plan.project_id)
+    if plan.suite_item_id:
+        from backend.api.testplans import record_suite
+
+        record_suite(plan.suite_item_id, last_plan_id=plan.id, last_run_id=run.id)
 
     async def work():
         try:

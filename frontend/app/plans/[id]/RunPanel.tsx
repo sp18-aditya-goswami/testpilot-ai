@@ -1,9 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { api, errorMessage, type TestPlan } from "@/lib/api";
-import { runHref } from "@/app/runs/format";
+import { isFlowPath, runHref } from "@/app/runs/format";
+import { flowHref } from "@/lib/testplans";
 import styles from "./plan.module.css";
 
 function caseCount(n: number) {
@@ -22,6 +23,7 @@ export function RunPanel({
   onAllowDestructive: (value: boolean) => void;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [fuzz, setFuzz] = useState(true);
   const [examples, setExamples] = useState("20");
   const [starting, setStarting] = useState(false);
@@ -56,7 +58,11 @@ export function RunPanel({
         fuzz,
         fuzz_examples: fuzz ? exampleNumber : 20,
       });
-      router.push(runHref({ id: run.id, spec_title: run.spec_title, project_id: run.project_id ?? plan.project_id }));
+      router.push(
+        isFlowPath(pathname)
+          ? flowHref.run(run.id)
+          : runHref({ id: run.id, spec_title: run.spec_title, project_id: run.project_id ?? plan.project_id }),
+      );
     } catch (err) {
       setError(errorMessage(err));
       setStarting(false);

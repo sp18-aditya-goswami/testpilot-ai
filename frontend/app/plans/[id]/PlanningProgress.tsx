@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { TestPlan } from "@/lib/api";
 import styles from "./plan.module.css";
 
-/** Live view of a plan Claude is still building: the steps so far, newest last, and the time spent. */
+/** Live view of a plan the AI is still building: the steps so far, newest last, and the time spent. */
 export function PlanningProgress({ plan, since }: { plan: TestPlan; since: number }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -18,7 +18,7 @@ export function PlanningProgress({ plan, since }: { plan: TestPlan; since: numbe
   return (
     <section className={`panel ${styles.progress}`} aria-labelledby="progress-head" aria-busy="true">
       <div className={styles.progressHead}>
-        <h2 id="progress-head">Claude is building the plan</h2>
+        <h2 id="progress-head">AI is building the plan</h2>
         <p className={styles.elapsed} aria-live="off">
           <span className="figure">{elapsed}</span> s
         </p>

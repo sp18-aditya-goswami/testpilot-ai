@@ -10,16 +10,16 @@ export interface SourceInfo {
 
 export const SOURCES: Record<Source, SourceInfo> = {
   ai: {
-    label: "Claude",
+    label: "AI",
     group: "AI-generated",
     icon: "spark",
-    meaning: "Claude proposed it from your instructions, rules and the spec. TestPilot validated it before it could run.",
+    meaning: "AI proposed it from your instructions, rules and the spec. TestPilot validated it before it could run.",
   },
   contract: {
-    label: "Contract",
+    label: "Schema",
     group: "System-generated",
     icon: "schema",
-    meaning: "TestPilot derived it from the OpenAPI schema: required fields, types, bounds and documented status codes.",
+    meaning: "Derived from the OpenAPI schema by TestPilot's rules: required fields, types, bounds and documented status codes.",
   },
   fuzz: {
     label: "Fuzzing",
@@ -35,7 +35,7 @@ export const SOURCES: Record<Source, SourceInfo> = {
   },
 };
 
-/** Who made a case. Text plus one icon; Claude's cases carry the AI colour. */
+/** Who made a case. Text plus one icon; AI-written cases carry the AI colour. */
 export function SourceTag({ source, withGroup = false }: { source: Source; withGroup?: boolean }) {
   const s = SOURCES[source];
   return (
@@ -54,7 +54,7 @@ export function ExplainedBy({ source }: { source: "ai" | "rules" }) {
   return source === "ai" ? (
     <span className="src src--ai">
       <Icon name="spark" />
-      Explained by Claude
+      Explained by AI
     </span>
   ) : (
     <span className="src src--contract">

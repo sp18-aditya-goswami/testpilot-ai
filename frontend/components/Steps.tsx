@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { Icon } from "./Icon";
 
-const STEPS = ["Load the spec", "Review the plan", "Run and read findings"] as const;
+export const FLOW_STEPS = ["Your API", "What to test", "Review plan", "Results"] as const;
+export type StepNumber = 1 | 2 | 3 | 4;
 
-/** The three-step flow. `current` is 1-based; earlier steps show as done. `suiteHref` links step 1, `planHref` step 2. */
-export function Steps({ current, planHref, suiteHref = "/" }: { current: 1 | 2 | 3; planHref?: string; suiteHref?: string }) {
+/**
+ * The four-step AI test plan flow. `current` is 1-based; earlier steps show as done and link back when `hrefs` names them.
+ */
+export function Steps({ current, hrefs = {} }: { current: StepNumber; hrefs?: Partial<Record<StepNumber, string>> }) {
   return (
     <ol className="steps" aria-label="Progress">
-      {STEPS.map((label, i) => {
-        const n = i + 1;
+      {FLOW_STEPS.map((label, i) => {
+        const n = (i + 1) as StepNumber;
         const state = n < current ? "done" : n === current ? "current" : "todo";
         const body = (
           <>
@@ -18,10 +21,10 @@ export function Steps({ current, planHref, suiteHref = "/" }: { current: 1 | 2 |
             <span className="step-label">{label}</span>
           </>
         );
-        const href = n === 1 ? suiteHref : n === 2 ? planHref : undefined;
+        const href = hrefs[n];
         return (
           <li key={label} data-state={state} aria-current={state === "current" ? "step" : undefined}>
-            {state === "done" && href ? <Link href={href}>{body}</Link> : body}
+            {state !== "current" && href ? <Link href={href}>{body}</Link> : body}
           </li>
         );
       })}

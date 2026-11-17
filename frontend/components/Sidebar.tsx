@@ -433,7 +433,7 @@ export function Sidebar() {
         <div className={styles.pickRow}>
           <span className={styles.pickLabel}>
             <label htmlFor="project-switch">Project</label>
-            <Link href="/">All projects</Link>
+            <Link href="/workspace">All projects</Link>
           </span>
           <select
             id="project-switch"

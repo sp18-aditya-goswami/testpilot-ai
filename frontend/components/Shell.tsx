@@ -7,8 +7,11 @@ import { api, type Health } from "@/lib/api";
 import { Wordmark } from "./Logo";
 import { ThemeSwitch } from "./ThemeSwitch";
 
+const PROVIDER_NAMES: Record<string, string> = { anthropic: "Anthropic API", openai: "OpenAI", bedrock: "AWS Bedrock" };
+
 const LINKS = [
-  { href: "/", label: "Projects", match: (p: string) => p === "/" || p.startsWith("/p/") },
+  { href: "/plans", label: "Test plans", match: (p: string) => p.startsWith("/plans") || p.startsWith("/runs") },
+  { href: "/workspace", label: "Workspace", match: (p: string) => p.startsWith("/workspace") || p.startsWith("/p/") },
   { href: "/settings", label: "Settings", match: (p: string) => p.startsWith("/settings") },
 ];
 
@@ -24,8 +27,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   if (health === "down") status = <span className="status status--failed">Backend offline</span>;
   else if (health) {
     status = health.ai_enabled ? (
-      <span className="status-text">
-        AI on, <span className="mono">{health.model}</span>
+      <span className="status-text" title={health.model ? `Model ${health.model}` : undefined}>
+        AI on, {PROVIDER_NAMES[health.provider ?? ""] ?? "provider set in Settings"}
       </span>
     ) : (
       <Link href="/settings" className="status-text">
@@ -40,7 +43,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     <>
       <header className="topbar">
         <div className="container" style={inProject ? { maxWidth: "none" } : undefined}>
-          <Link href="/" className="wordmark" aria-label="TestPilot, all projects">
+          <Link href="/" className="wordmark" aria-label="TestPilot home">
             <Wordmark />
           </Link>
           <nav className="nav" aria-label="Main">

@@ -5,7 +5,7 @@ import { Icon } from "@/components/Icon";
 import { MethodPath } from "@/components/Status";
 import styles from "./plan.module.css";
 
-/** Ask Claude for more cases in plain words, optionally for a few endpoints only. */
+/** Ask the AI for more cases in plain words, optionally for a few endpoints only. */
 export function RefineBox({
   endpoints,
   aiOff,
@@ -36,7 +36,7 @@ export function RefineBox({
       setText("");
       setOnly(new Set());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Claude could not add cases.");
+      setError(err instanceof Error ? err.message : "The AI could not add cases.");
     } finally {
       setBusy(false);
     }
@@ -47,7 +47,7 @@ export function RefineBox({
     <form className={`panel ${styles.refine}`} onSubmit={submit} aria-labelledby={`${uid}-head`} noValidate>
       <div className={styles.refineHead}>
         <Icon name="spark" />
-        <h2 id={`${uid}-head`}>Ask Claude for more cases</h2>
+        <h2 id={`${uid}-head`}>Ask the AI for more cases</h2>
       </div>
       <div className="field">
         <label htmlFor={`${uid}-text`} className="visually-hidden">
@@ -93,7 +93,7 @@ export function RefineBox({
         </details>
         <button type="submit" className="key" disabled={aiOff || busy} aria-busy={busy || undefined} aria-describedby={helpId}>
           {busy && <span className="spinner keep-motion" aria-hidden="true" />}
-          {busy ? "Asking Claude" : "Add cases"}
+          {busy ? "Asking the AI" : "Add cases"}
         </button>
       </div>
       <p id={helpId} className={`helper${error ? " is-error" : ""}`} role={error ? "alert" : undefined}>

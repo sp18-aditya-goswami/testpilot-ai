@@ -120,7 +120,8 @@ function AiSection({ settings, onChange }: { settings: Settings; onChange: (s: S
     ? `Using ${PROVIDER_NAME[provider]}, ${ai.model}`
     : `${PROVIDER_NAME[provider]} is not set up yet, so AI planning and explanations are off`;
 
-  const saveProvider = () => {
+  /** What the provider form holds now, as a settings patch. Check connection saves it first, so it tests what you see. */
+  const providerPatch = (): SettingsPatch => {
     const patch: SettingsPatch = {};
     if (provider === "anthropic") {
       patch.anthropic_model = anthropicModel.trim();
@@ -132,14 +133,24 @@ function AiSection({ settings, onChange }: { settings: Settings; onChange: (s: S
       patch.aws_region = region.trim();
       patch.bedrock_auth = bedrockAuth;
       patch.bedrock_model = bedrockModel.trim();
-      patch.aws_profile = profile.trim();
+      patch.aws_profile = bedrockAuth === "default" ? profile.trim() : "";
       if (secrets.accessKey.trim()) patch.aws_access_key_id = secrets.accessKey.trim();
       if (secrets.secret.trim()) patch.aws_secret_access_key = secrets.secret.trim();
       if (secrets.session.trim()) patch.aws_session_token = secrets.session.trim();
       if (secrets.bedrockKey.trim()) patch.bedrock_api_key = secrets.bedrockKey.trim();
     }
-    void run("save", async () => apply(await ws.updateSettings(patch), `${PROVIDER_NAME[provider]} settings saved.`));
+    return patch;
   };
+  const saveProvider = () => {
+    void run("save", async () => apply(await ws.updateSettings(providerPatch()), `${PROVIDER_NAME[provider]} settings saved.`));
+  };
+  const saveAndCheck = () =>
+    run("check", async () => {
+      const next = await ws.updateSettings(providerPatch());
+      apply(next, "");
+      setSaved(null);
+      setCheck(next.ai.configured ? await ws.checkAi() : { ok: false, message: `${PROVIDER_NAME[provider]} is missing a credential or region. Fill it in above.` });
+    });
 
   const removeSecrets = () => {
     const patch: SettingsPatch =
@@ -164,7 +175,7 @@ function AiSection({ settings, onChange }: { settings: Settings; onChange: (s: S
         </p>
       </div>
       <p className="small">
-        Claude or OpenAI plans test cases and explains failures. Credentials stay on the TestPilot server in a file only its owner can read, and are never
+        AI plans test cases and explains failures. Credentials stay on the TestPilot server in a file only its owner can read, and are never
         sent back to the browser.
       </p>
 
@@ -232,7 +243,7 @@ function AiSection({ settings, onChange }: { settings: Settings; onChange: (s: S
         {provider === "bedrock" && (
           <>
             <p className="small">
-              Runs Claude through Amazon Bedrock, billed to your AWS account and credits. Enable the Claude model in the Bedrock console for the region first.
+              Runs Anthropic models through Amazon Bedrock, billed to your AWS account and credits. Enable the model in the Bedrock console for the region first.
             </p>
             <div className={styles.grid}>
               <div className="field">
@@ -256,7 +267,7 @@ function AiSection({ settings, onChange }: { settings: Settings; onChange: (s: S
               <div className="field">
                 <label htmlFor={ids.model}>Model or inference profile</label>
                 <input id={ids.model} className="input mono" autoComplete="off" spellCheck={false} value={bedrockModel} onChange={(e) => setBedrockModel(e.target.value)} />
-                <p className="helper">Default anthropic.claude-opus-5-5. Use the id your Bedrock console shows.</p>
+                <p className="helper">Paste the model id or inference profile id from the Bedrock console for this region, for example anthropic.claude-opus-5-5 or apac.anthropic.claude-sonnet-4-5-20250929-v1:0.</p>
               </div>
             </div>
 
@@ -345,13 +356,12 @@ function AiSection({ settings, onChange }: { settings: Settings; onChange: (s: S
         <button
           type="button"
           className="key"
-          disabled={busy !== null || !ai.configured}
-          title={ai.configured ? undefined : "Save the provider settings first"}
+          disabled={busy !== null}
           aria-busy={busy === "check"}
-          onClick={() => run("check", async () => setCheck(await ws.checkAi()))}
+          onClick={() => void saveAndCheck()}
         >
           {busy === "check" && <span className="spinner" aria-hidden="true" />}
-          Check connection
+          Save and check connection
         </button>
         {provider === "bedrock" && <p className="helper">Bedrock has no free check, so this sends one tiny request.</p>}
       </div>
@@ -497,7 +507,7 @@ export default function SettingsPage() {
       <div className="page-head">
         <div>
           <h1>Settings</h1>
-          <p>Connect Claude for AI test planning and failure explanations, and choose where TestPilot may send requests.</p>
+          <p>Connect an AI provider for test planning and failure explanations, and choose where TestPilot may send requests.</p>
         </div>
       </div>
       {error ? (

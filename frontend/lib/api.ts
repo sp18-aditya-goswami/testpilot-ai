@@ -175,6 +175,7 @@ export interface Health {
   status: string;
   ai_enabled: boolean;
   model: string | null;
+  provider?: "anthropic" | "openai" | "bedrock";
   allowed_hosts: string[];
   limits: { max_concurrency: number; max_requests_per_run: number; request_timeout_s: number };
 }

@@ -10,10 +10,11 @@ import { itemTrail } from "@/components/itemTrail";
 import { useOptionalProject } from "@/components/ProjectContext";
 import { SourceLegend, SourceTag } from "@/components/Source";
 import { MethodPath } from "@/components/Status";
-import { Steps } from "@/components/Steps";
+import { Steps, type StepNumber } from "@/components/Steps";
 import { api, ApiError, errorMessage, type Category, type RequestSpec, type Source, type TestCase, type TestPlan } from "@/lib/api";
-import { ws } from "@/lib/workspace";
-import { planHref } from "@/app/runs/format";
+import { flowHref } from "@/lib/testplans";
+import { isFlowPath } from "@/app/runs/format";
+import { ws, type Item } from "@/lib/workspace";
 import { CaseEditor, DeleteCaseDialog, type CaseBody } from "./CaseEditor";
 import { CATEGORIES, CoverageGrid, sourceSplit, type CoverageFilter } from "./CoverageGrid";
 import { PlanningProgress } from "./PlanningProgress";
@@ -42,7 +43,7 @@ function toCategory(value: string | null): Category | null {
 
 function homeHref(plan: TestPlan) {
   if (plan.project_id && plan.suite_item_id) return `/p/${plan.project_id}/suites/${plan.suite_item_id}`;
-  return plan.project_id ? `/p/${plan.project_id}` : "/";
+  return plan.project_id ? `/p/${plan.project_id}` : "/workspace";
 }
 
 function toFilter(value: string | null): SourceFilter {
@@ -74,7 +75,7 @@ function hasTemplates(c: TestCase) {
 export function PlanSkeleton() {
   return (
     <div aria-busy="true" aria-label="Loading the plan">
-      <Steps current={2} />
+      <Steps current={3} />
       <div className="page-head">
         <div className="stack" style={{ width: "min(100%, 34rem)" }}>
           <div className="skeleton" style={{ height: "var(--space-xl)", width: "80%" }} />
@@ -137,7 +138,7 @@ function Expects({ codes }: { codes: number[] }) {
 }
 
 const REASON_LABEL: Record<Source, string> = {
-  ai: "Claude's reasoning",
+  ai: "AI reasoning",
   contract: "Schema rule",
   fuzz: "Fuzzing",
   saved: "Your note",
@@ -214,7 +215,8 @@ export function PlanReview({ id }: { id: string }) {
   const [planningSince, setPlanningSince] = useState<number>(() => Date.now());
   const knownIds = useRef<Set<string> | null>(null);
   const project = useOptionalProject();
-  const [suiteName, setSuiteName] = useState<string | null>(null);
+  const flow = isFlowPath(pathname);
+  const [suiteItem, setSuiteItem] = useState<Item | null>(null);
 
   /** Swap in a newer copy of the plan: new cases start selected, removed ones drop out of the selection. */
   const accept = useCallback((plan: TestPlan, markNew: boolean) => {
@@ -257,21 +259,42 @@ export function PlanReview({ id }: { id: string }) {
   const suiteItemId = plan?.suite_item_id ?? null;
 
   const tree = project?.tree ?? null;
-  const treeHasSuite = !!(tree && suiteItemId && plan?.project_id && itemTrail(tree, plan.project_id, suiteItemId).length > 1);
 
+  // The suite item names the plan and knows its latest run; re-read it once the plan is ready so a run started elsewhere shows up.
   useEffect(() => {
-    if (!suiteItemId || treeHasSuite) return;
+    if (!suiteItemId) return;
     let live = true;
     ws.item(suiteItemId).then(
-      (item) => live && setSuiteName(item.name),
-      () => live && setSuiteName(null),
+      (item) => live && setSuiteItem(item),
+      () => live && setSuiteItem(null),
     );
     return () => {
       live = false;
     };
-  }, [suiteItemId, treeHasSuite]);
+  }, [suiteItemId, plan?.status]);
+
+  const ownItem = suiteItem && suiteItem.id === suiteItemId ? suiteItem : null;
+  const suiteName = ownItem?.name ?? null;
+  const lastRunId = ownItem?.suite?.last_plan_id === plan?.id ? (ownItem?.suite?.last_run_id ?? null) : null;
+
+  /** Step 2 edits what to test; step 4 opens this plan's latest run when there is one. */
+  function stepHrefs(pl: TestPlan): Partial<Record<StepNumber, string>> {
+    const hrefs: Partial<Record<StepNumber, string>> = {};
+    if (flow) {
+      if (pl.suite_item_id) hrefs[2] = flowHref.edit(pl.suite_item_id);
+    } else hrefs[2] = homeHref(pl);
+    if (lastRunId) hrefs[4] = flow || !pl.project_id ? flowHref.run(lastRunId) : `/p/${pl.project_id}/runs/${encodeURIComponent(lastRunId)}`;
+    return hrefs;
+  }
+
+  /** Where "back" goes from a plan with nothing to review. */
+  function backLink(pl: TestPlan): { href: string; label: string } {
+    if (flow) return pl.suite_item_id ? { href: flowHref.edit(pl.suite_item_id), label: "Edit what to test" } : { href: flowHref.list, label: "Back to test plans" };
+    return { href: homeHref(pl), label: pl.suite_item_id ? "Back to the suite" : "Back to the project" };
+  }
 
   function crumbs(pl: TestPlan): Crumb[] {
+    if (flow) return [{ label: "Test plans", href: flowHref.list }, { label: suiteName ?? pl.spec_title }];
     const last: Crumb = { label: `Plan, ${planTime(pl.created_at)}` };
     if (!pl.project_id) return [last];
     const suiteHref = pl.suite_item_id ? `/p/${pl.project_id}/suites/${pl.suite_item_id}` : undefined;
@@ -303,10 +326,6 @@ export function PlanReview({ id }: { id: string }) {
     return () => clearTimeout(t);
   }, [newIds]);
 
-  useEffect(() => {
-    if (plan?.project_id && !pathname.startsWith("/p/")) router.replace(planHref(plan.id, plan.project_id));
-  }, [plan?.project_id, plan?.id, pathname, router]);
-
   const groups = useMemo(() => {
     const map = new Map<string, TestCase[]>();
     for (const c of plan?.cases ?? []) {
@@ -325,7 +344,7 @@ export function PlanReview({ id }: { id: string }) {
   if (load.state === "error") {
     return (
       <>
-        <Steps current={2} />
+        <Steps current={3} />
         <div className="error-state" role="alert">
           <h3>{load.notFound ? "This plan does not exist" : "The plan could not be loaded"}</h3>
           <p>{load.notFound ? "It may have been created on another machine, or the link is incomplete." : load.message}</p>
@@ -335,8 +354,8 @@ export function PlanReview({ id }: { id: string }) {
                 Try again
               </button>
             )}
-            <Link href="/" className="key key--plain">
-              Open projects
+            <Link href={flow ? flowHref.list : "/workspace"} className="key key--plain">
+              {flow ? "Open test plans" : "Open projects"}
             </Link>
           </div>
         </div>
@@ -345,12 +364,13 @@ export function PlanReview({ id }: { id: string }) {
   }
 
   const p = load.plan;
+  const back = backLink(p);
 
   if (p.status === "planning") {
     return (
       <>
         <Breadcrumbs items={crumbs(p)} />
-        <Steps current={2} suiteHref={homeHref(p)} />
+        <Steps current={3} hrefs={stepHrefs(p)} />
         <div className="page-head">
           <div>
             <h1>Planning tests for {p.spec_title}</h1>
@@ -368,7 +388,7 @@ export function PlanReview({ id }: { id: string }) {
     return (
       <>
         <Breadcrumbs items={crumbs(p)} />
-        <Steps current={2} suiteHref={homeHref(p)} />
+        <Steps current={3} hrefs={stepHrefs(p)} />
         <div className="error-state" role="alert">
           <h3>The plan could not be built</h3>
           <p>{p.progress[p.progress.length - 1] ?? p.ai_message ?? "The planner stopped before it finished."}</p>
@@ -376,8 +396,8 @@ export function PlanReview({ id }: { id: string }) {
             <button type="button" className="key" onClick={fetchPlan}>
               Check again
             </button>
-            <Link href={homeHref(p)} className="key key--plain">
-              {p.suite_item_id ? "Back to the suite" : "Back to the project"}
+            <Link href={back.href} className="key key--plain">
+              {back.label}
             </Link>
           </div>
         </div>
@@ -461,7 +481,7 @@ export function PlanReview({ id }: { id: string }) {
   return (
     <>
       <Breadcrumbs items={crumbs(p)} />
-      <Steps current={2} suiteHref={homeHref(p)} />
+      <Steps current={3} hrefs={stepHrefs(p)} />
 
       <div className="page-head">
         <div>
@@ -470,6 +490,12 @@ export function PlanReview({ id }: { id: string }) {
             Runs against <span className={styles.base}>{p.base_url}</span>. Untick anything you do not want sent.
           </p>
         </div>
+        {p.suite_item_id && (
+          <Link href={flow ? flowHref.edit(p.suite_item_id) : homeHref(p)} className="key">
+            <Icon name="pencil" />
+            Edit what to test
+          </Link>
+        )}
       </div>
 
       <section className={styles.provenance} aria-labelledby="provenance-head">
@@ -487,7 +513,7 @@ export function PlanReview({ id }: { id: string }) {
           <p className="notice">
             <span className="src src--ai">
               <Icon name="spark" />
-              Claude
+              AI
             </span>
             <span>
               proposed {plural(aiCount + p.rejected.length, "scenario")}. TestPilot checked each one against the spec before it could join the plan
@@ -500,11 +526,11 @@ export function PlanReview({ id }: { id: string }) {
             <Icon name="alert" />
             <span>
               {p.ai_status === "error"
-                ? `Claude could not plan this time: ${p.ai_message} Every case below is system-generated or written by you. `
+                ? `AI could not plan this time: ${p.ai_message} Every case below is system-generated or written by you. `
                 : p.ai_status === "disabled"
-                  ? "AI planning is off, so every case below comes from the contract engine or from you. "
-                  : "AI scenarios were not requested for this plan, so every case below comes from the contract engine or from you. "}
-              <Link href="/settings">Turn on AI in Settings</Link>
+                  ? "AI planning is off, so every case below comes from the schema rules or from you. "
+                  : "AI scenarios were not requested for this plan, so every case below comes from the schema rules or from you. "}
+              <Link href="/settings">{p.ai_status === "error" ? "Check the AI provider in Settings" : "Turn on AI in Settings"}</Link>
             </span>
           </p>
         )}
@@ -529,9 +555,9 @@ export function PlanReview({ id }: { id: string }) {
       {p.cases.length === 0 ? (
         <div className="empty">
           <h3>This plan has no cases</h3>
-          <p>Neither the contract engine nor the AI planner produced a case. Check that the specification has operations and that AI planning is on.</p>
-          <Link href={homeHref(p)} className="key">
-            {p.suite_item_id ? "Back to the suite" : "Back to the project"}
+          <p>Neither the schema rules nor the AI planner produced a case. Check that the specification has operations and that AI planning is on.</p>
+          <Link href={back.href} className="key">
+            {back.label}
           </Link>
         </div>
       ) : (
@@ -544,7 +570,7 @@ export function PlanReview({ id }: { id: string }) {
                     <Icon name="chevron" size={12} />
                     <span className="src src--ai">
                       <Icon name="spark" />
-                      How Claude planned this
+                      How AI planned this
                     </span>
                   </summary>
                   <ul className={styles.strategy}>
@@ -573,7 +599,7 @@ export function PlanReview({ id }: { id: string }) {
                     <Icon name="chevron" size={12} />
                     <span className="src src--ai">
                       <Icon name="spark" />
-                      What Claude&rsquo;s review pass changed
+                      What the AI review pass changed
                     </span>
                   </summary>
                   <ul className={styles.reviewNotes}>
@@ -602,11 +628,11 @@ export function PlanReview({ id }: { id: string }) {
               </button>
               <button type="button" aria-pressed={filter === "ai"} onClick={() => setFilter("ai")}>
                 <Icon name="spark" />
-                Claude ({aiCount})
+                AI ({aiCount})
               </button>
               <button type="button" aria-pressed={filter === "contract"} onClick={() => setFilter("contract")}>
                 <Icon name="schema" />
-                Contract ({contractCount})
+                Schema ({contractCount})
               </button>
               <button type="button" aria-pressed={filter === "saved"} onClick={() => setFilter("saved")}>
                 <Icon name="pencil" />
@@ -652,19 +678,19 @@ export function PlanReview({ id }: { id: string }) {
                 {coverageOn
                   ? "No case matches both filters"
                   : filter === "ai"
-                    ? "No cases from Claude in this plan"
+                    ? "No cases from AI in this plan"
                     : filter === "saved"
                       ? "No cases written by you yet"
-                      : "No contract cases in this plan"}
+                      : "No schema cases in this plan"}
               </h3>
               <p>
                 {coverageOn
                   ? "The coverage cell and the source filter together leave nothing to show."
                   : filter === "ai"
-                    ? "AI planning was off or returned nothing. Contract cases still cover the schema."
+                    ? "AI planning was off or returned nothing. Schema cases still check the documented contract."
                     : filter === "saved"
                       ? "Use Add case on an endpoint to write one by hand."
-                      : "Contract cases were turned off when this plan was created."}
+                      : "Schema cases were turned off when this plan was created."}
               </p>
               <button type="button" className="key" onClick={() => setQuery({ source: "all", endpoint: null, category: null })}>
                 Show all cases

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api import core, navigation, planning, settings, workspace
+from backend.api import core, navigation, planning, settings, testplans, workspace
 
 app = FastAPI(title="TestPilot AI", version="0.2.0")
 app.add_middleware(
@@ -15,3 +15,4 @@ app.include_router(planning.router)
 app.include_router(workspace.router)
 app.include_router(navigation.router)
 app.include_router(settings.router)
+app.include_router(testplans.router)

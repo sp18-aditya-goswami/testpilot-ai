@@ -1,0 +1,56 @@
+/* Hallmark · module: new test plan flow · system and stamp in app/globals.css */
+
+.head { display: grid; gap: var(--space-sm); margin-bottom: var(--space-lg); }
+.head h1 { font-size: var(--text-3xl); line-height: 1.08; max-width: 26ch; }
+.head p { color: var(--color-ink-2); max-width: 60ch; }
+
+.skeleton { display: grid; gap: var(--space-sm); max-width: 52rem; }
+.skeleton :global(.skeleton) { height: 120px; }
+
+.form { display: grid; gap: var(--space-md); max-width: 52rem; }
+.card { display: grid; gap: var(--space-md); padding: var(--space-lg); max-width: 52rem; min-width: 0; }
+.cardTitle { font-size: var(--text-lg); font-weight: 400; }
+.block { display: grid; gap: var(--space-md); }
+.block + .block { padding-top: var(--space-md); border-top: var(--rule-hair) solid var(--color-rule); }
+.blockHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; }
+.actions { display: flex; align-items: center; gap: var(--space-xs) var(--space-sm); flex-wrap: wrap; }
+
+.target { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-md) var(--space-lg); margin-bottom: var(--space-md); max-width: 52rem; flex-wrap: wrap; }
+.targetMain { display: grid; gap: var(--space-3xs); min-width: 0; }
+.targetMain :global(.mono) { overflow-wrap: anywhere; }
+.targetTitle { color: var(--color-ink); font-size: var(--text-lg); font-weight: 400; }
+
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-xs); list-style: none; margin: 0; padding: 0; }
+.chip { display: inline-flex; align-items: center; gap: var(--space-2xs); min-height: 36px; padding: 0 var(--space-md); border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--color-ink-2); box-shadow: inset 0 0 0 var(--rule-hair) var(--color-rule-2); font: 400 var(--text-sm)/1 var(--font-body); cursor: pointer; white-space: nowrap; transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out); }
+@media (hover: hover) { .chip:hover:not(:disabled) { color: var(--color-ink); background: var(--color-paper-3); } }
+.chip:active:not(:disabled) { transform: translateY(1px); }
+.chip:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.chip[aria-pressed="true"] { background: var(--color-ink); color: var(--color-paper); box-shadow: none; }
+.chip:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.depth { display: flex; align-items: center; gap: var(--space-xs) var(--space-md); flex-wrap: wrap; padding-top: var(--space-md); border-top: var(--rule-hair) solid var(--color-rule); }
+
+.more { max-width: 52rem; }
+.more summary { display: flex; align-items: baseline; gap: var(--space-sm); flex-wrap: wrap; padding: var(--space-md) var(--space-lg); cursor: pointer; color: var(--color-ink); list-style: none; border-radius: var(--radius-card); transition: background-color var(--dur-micro) var(--ease-out); }
+.more summary::-webkit-details-marker { display: none; }
+.more summary::before { content: "+"; display: inline-block; width: 1ch; color: var(--color-muted); transition: transform var(--dur-micro) var(--ease-out); }
+.more[open] summary::before { transform: rotate(45deg); }
+@media (hover: hover) { .more summary:hover { background: var(--color-paper-3); } }
+.more summary:active { background: var(--color-paper-3); }
+.more summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.moreBody { display: grid; gap: var(--space-lg); padding: 0 var(--space-lg) var(--space-lg); }
+.fieldset { display: grid; gap: var(--space-xs); margin: 0; padding: 0; border: 0; min-width: 0; }
+.fieldset legend { margin-bottom: var(--space-xs); }
+.endpoints { display: grid; gap: var(--space-xs); list-style: none; margin: 0; padding: 0; max-height: 18rem; overflow-y: auto; }
+.endpointLabel { display: grid; gap: var(--space-3xs); min-width: 0; }
+.endpointLabel :global(.method-path) { white-space: normal; overflow-wrap: anywhere; }
+.twoCol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md); }
+.finish { gap: var(--space-sm); }
+
+@media (max-width: 40rem) {
+  .head h1 { font-size: var(--text-2xl); }
+  .card, .target { padding: var(--space-md); }
+  .more summary { padding: var(--space-md); }
+  .moreBody { padding: 0 var(--space-md) var(--space-md); }
+  .twoCol { grid-template-columns: minmax(0, 1fr); }
+}

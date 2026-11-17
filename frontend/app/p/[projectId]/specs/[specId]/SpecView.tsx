@@ -9,6 +9,7 @@ import { Icon } from "@/components/Icon";
 import { useProject } from "@/components/ProjectContext";
 import { MethodPath } from "@/components/Status";
 import { api, errorMessage, type ApiSummary, type Endpoint, type Json } from "@/lib/api";
+import { flowHref } from "@/lib/testplans";
 import { DEFAULT_PLANNER_CONFIG, ws, type PlanSummary, type RunListItem, type SpecUsage } from "@/lib/workspace";
 import { formatWhen, PlanList, RunResult } from "../PlanList";
 import styles from "../specs.module.css";
@@ -300,10 +301,14 @@ export function SpecView({ projectId, specId }: { projectId: string; specId: str
                 {importing && <span className="spinner" aria-hidden="true" />}
                 Import as requests
               </button>
-              <button type="button" className="key key--primary" onClick={openCreate}>
+              <button type="button" className="key" onClick={openCreate}>
                 <Icon name="plus" />
                 New test suite
               </button>
+              <Link className="key key--primary" href={flowHref.fromSpec(projectId, specId)}>
+                <Icon name="spark" />
+                Build an AI test plan from this spec
+              </Link>
             </div>
           </div>
         </header>
@@ -375,7 +380,7 @@ export function SpecView({ projectId, specId }: { projectId: string; specId: str
           <div className={styles.usageSkeleton} aria-hidden="true"><div className="skeleton" /></div>
         ) : usage.suites.length === 0 ? (
           <div className={styles.empty}>
-            <p>No suite uses this spec yet. A suite turns the contract, your rules and Claude&rsquo;s scenarios into a test plan.</p>
+            <p>No suite uses this spec yet. A suite turns the contract, your rules and AI scenarios into a test plan.</p>
             <button type="button" className="key" onClick={openCreate}>
               New test suite
             </button>

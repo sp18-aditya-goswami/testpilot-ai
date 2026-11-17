@@ -1,0 +1,59 @@
+/* Hallmark · module: landing · system and stamp in app/globals.css */
+
+.hero { padding-block: var(--space-2xl) var(--space-xl); display: grid; gap: var(--space-md); }
+.title { font-size: clamp(2.25rem, 1.4rem + 3.2vw, 3.75rem); font-weight: 300; line-height: 1.02; max-width: 16ch; }
+.lead { font-size: var(--text-xl); font-weight: 300; color: var(--color-ink-2); max-width: 40ch; line-height: 1.4; }
+
+.doors { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: var(--space-md); align-items: stretch; }
+.door { display: grid; grid-template-rows: auto auto 1fr auto; gap: var(--space-sm); padding: var(--space-xl) var(--space-lg) var(--space-lg); border: var(--rule-hair) solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper-2); min-width: 0; }
+.doorMain { position: relative; border-color: var(--color-rule-2); background: linear-gradient(170deg, var(--color-accent-wash), var(--color-paper-2) 60%); }
+.doorMain::before { content: ""; position: absolute; inset: 0; pointer-events: none; border: var(--rule-hair) solid var(--color-accent); border-radius: var(--radius-card); -webkit-mask: conic-gradient(at var(--tick) var(--tick), transparent 75%, var(--color-ink) 0) 0 0 / calc(100% - var(--tick)) calc(100% - var(--tick)); mask: conic-gradient(at var(--tick) var(--tick), transparent 75%, var(--color-ink) 0) 0 0 / calc(100% - var(--tick)) calc(100% - var(--tick)); }
+.doorIcon { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-pill); background: var(--color-paper-3); color: var(--color-ink-2); }
+.doorMain .doorIcon { background: var(--color-ai-wash); color: var(--color-ai); }
+.doorTitle { font-size: var(--text-2xl); font-weight: 300; max-width: none; }
+.doorText { color: var(--color-ink-2); max-width: 44ch; }
+.doorActions { display: flex; gap: var(--space-xs); flex-wrap: wrap; padding-top: var(--space-sm); }
+
+.flow { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-lg); list-style: none; margin: 0; padding: 0; font-size: var(--text-sm); color: var(--color-ink-2); align-self: end; }
+.flow li { display: inline-flex; align-items: center; gap: var(--space-xs); white-space: nowrap; }
+.flowNum { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: var(--radius-pill); box-shadow: inset 0 0 0 var(--rule-hair) var(--color-rule-2); font-size: var(--text-xs); font-variant-numeric: tabular-nums; color: var(--color-muted); }
+
+.notice { margin-top: var(--space-md); }
+.notice a { color: var(--color-ink); }
+
+.recent { margin-top: var(--space-2xl); }
+.recentHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-md); }
+.emptyLine { color: var(--color-muted); font-size: var(--text-sm); padding-block: var(--space-md); border-top: var(--rule-hair) solid var(--color-rule); }
+.skeleton { display: grid; gap: var(--space-sm); }
+.skeleton :global(.skeleton) { height: 56px; }
+.list { list-style: none; margin: 0; padding: 0; overflow: hidden; }
+.list li + li { border-top: var(--rule-hair) solid var(--color-rule); }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto 8rem auto; align-items: center; gap: var(--space-lg); padding: var(--space-sm) var(--space-lg); text-decoration: none; color: var(--color-ink-2); transition: background-color var(--dur-micro) var(--ease-out); }
+.row > svg { color: var(--color-muted); }
+@media (hover: hover) { .row:hover { background: var(--color-paper-3); } .row:hover > svg { color: var(--color-ink); } }
+.row:active { background: var(--color-paper-3); }
+.row:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.rowName { display: grid; gap: var(--space-3xs); min-width: 0; }
+.rowTitle { color: var(--color-ink); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rowMeta { font-size: var(--text-sm); color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rowTime { font-size: var(--text-sm); color: var(--color-muted); text-align: right; white-space: nowrap; }
+
+.how { margin-top: var(--space-2xl); padding-top: var(--space-xl); border-top: var(--rule-hair) solid var(--color-rule); }
+.how > h2 { margin-bottom: var(--space-lg); }
+.howList { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-lg); list-style: none; margin: 0; padding: 0; }
+.howList li { display: grid; gap: var(--space-xs); align-content: start; }
+.howList h3 { font-size: var(--text-md); }
+.howList p { font-size: var(--text-sm); color: var(--color-ink-2); max-width: 36ch; }
+
+@media (max-width: 60rem) {
+  .doors { grid-template-columns: minmax(0, 1fr); }
+  .howList { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 40rem) {
+  .hero { padding-block: var(--space-xl) var(--space-lg); }
+  .door { padding: var(--space-lg) var(--space-md) var(--space-md); }
+  .row { grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-xs) var(--space-md); padding-inline: var(--space-md); }
+  .row > :global(.status) { grid-column: 1; grid-row: 2; }
+  .rowTime { grid-column: 2; grid-row: 1 / span 2; }
+  .row > svg { display: none; }
+}

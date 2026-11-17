@@ -13,9 +13,9 @@ export const CATEGORIES: { id: Category; label: string }[] = [
   { id: "robustness", label: "Robustness" },
 ];
 
-const SPLIT_LABEL: Record<Source, string> = { ai: "from Claude", contract: "from the contract", fuzz: "from fuzzing", saved: "written by you" };
+const SPLIT_LABEL: Record<Source, string> = { ai: "from AI", contract: "from the schema", fuzz: "from fuzzing", saved: "written by you" };
 
-/** "2 from Claude, 1 from the contract": who made a set of cases. */
+/** "2 from AI, 1 from the schema": who made a set of cases. */
 export function sourceSplit(cases: TestCase[]): string {
   const order: Source[] = ["ai", "contract", "saved", "fuzz"];
   return order
