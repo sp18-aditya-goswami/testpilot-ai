@@ -211,13 +211,21 @@ def build() -> None:
     s = prs.slides.add_slide(blank)
     background(s)
     heading(s, "Limits today, and what is next")
-    limits = "Login with cookies is not supported yet.\nFuzzing requests go without the sign-in token.\nEndpoints must be marked as protected in the spec."
-    nxt = "What changed since the last run: new, fixed and still failing.\nExport tests as code: pytest and Postman."
-    for i, (t, body, color) in enumerate([("Limits today", limits, INK), ("Next", nxt, ACCENT)]):
-        x = 128 + i * (w2 + 40)
-        rect(s, x, 300, w2, 420, PANEL, line=RULE, radius=16)
-        text(s, x + 44, 344, w2 - 88, 56, t, 40, color=color, bold=True)
-        text(s, x + 44, 430, w2 - 88, 260, body.split("\n"), 32, color=INK2, line=1.25, gap=24, bullets=True)
+    limits = ["Login with cookies is not supported yet.", "Fuzzing requests go without the sign-in token."]
+    nxt = [
+        "What changed since the last run: new, fixed, still failing.",
+        "Export tests as code: pytest and Postman.",
+        "Run on every pull request and block failing merges.",
+        "Nightly checks with Slack or email alerts.",
+        "One-click Jira or GitHub issues from a failure.",
+        "Re-run only the cases that failed.",
+        "Team accounts with admin, tester and viewer roles.",
+    ]
+    cards = [("Limits today", limits, INK, 128, 560), ("Next", nxt, ACCENT, 128 + 560 + 40, 1664 - 560 - 40)]
+    for t, items, color, x, w in cards:
+        rect(s, x, 270, w, 600, PANEL, line=RULE, radius=16)
+        text(s, x + 44, 314, w - 88, 56, t, 40, color=color, bold=True)
+        text(s, x + 44, 396, w - 88, 440, items, 28, color=INK2, line=1.2, gap=18, bullets=True)
     notes(s, "Honest limits so there are no surprises. Roadmap items are not built yet.")
 
     # 9. Questions

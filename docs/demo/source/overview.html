@@ -15,59 +15,95 @@
     --muted: #94A0A8;
     --accent: #C6F15C;
     --accent-ink: #18240A;
+    --amber: #F2B84B;
     --font: 'Geologica', Arial, sans-serif;
   }
   @page { size: A4; margin: 0; }
   * { box-sizing: border-box; margin: 0; }
   html, body { background: var(--paper); }
   body { font-family: var(--font); color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .page { width: 210mm; height: 297mm; padding: 20mm 18mm 16mm; display: flex; flex-direction: column; overflow: hidden; }
-  .brand { font-size: 10pt; color: var(--muted); }
-  h1 { font-size: 34pt; font-weight: 600; line-height: 1.05; }
-  .rule { width: 18mm; height: 1.6mm; background: var(--accent); margin: 6mm 0; }
-  .lede { font-size: 16pt; font-weight: 400; line-height: 1.3; color: var(--ink); }
-  .sub { font-size: 11pt; line-height: 1.5; color: var(--ink-2); margin-top: 2.5mm; }
-  h2 { font-size: 15pt; font-weight: 600; margin-top: 9mm; }
-  p.body { font-size: 10.5pt; line-height: 1.6; color: var(--ink-2); margin-top: 3mm; max-width: 165mm; }
-  p.body b { color: var(--ink); font-weight: 600; }
-  .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4mm; margin-top: 5mm; }
-  .step { background: var(--panel); border: 0.3mm solid var(--rule); border-radius: 3mm; padding: 4.5mm 4mm; }
-  .step .num { margin: 0; width: 8mm; height: 8mm; border-radius: 4mm; background: var(--accent); color: var(--accent-ink); font-size: 10pt; font-weight: 600; line-height: 8mm; text-align: center; }
-  .step h3 { font-size: 11.5pt; font-weight: 600; margin-top: 3.5mm; }
-  .step p { font-size: 9.5pt; line-height: 1.45; color: var(--ink-2); margin-top: 1.8mm; }
-  .principle { font-size: 11pt; line-height: 1.5; margin-top: 6mm; }
-  .principle .accent { color: var(--accent); }
-  .spacer { flex: 1; min-height: 6mm; }
-  .close { font-size: 11pt; line-height: 1.5; color: var(--ink); border-top: 0.3mm solid var(--rule); padding-top: 5mm; }
-  .foot { font-size: 9pt; color: var(--muted); margin-top: 3mm; }
+  .page { width: 210mm; height: 297mm; padding: 12mm 15mm 10mm; display: flex; flex-direction: column; overflow: hidden; }
+
+  .top { display: flex; justify-content: space-between; align-items: baseline; }
+  .squad { font-size: 9pt; color: var(--muted); }
+  h1 { font-size: 26pt; font-weight: 600; line-height: 1.05; }
+  .rule { width: 14mm; height: 1.2mm; background: var(--accent); margin: 3mm 0 3mm; }
+  .lede { font-size: 13.5pt; line-height: 1.25; }
+  .sub { font-size: 9.5pt; line-height: 1.45; color: var(--ink-2); margin-top: 1.2mm; }
+
+  h2 { font-size: 12pt; font-weight: 600; margin-top: 5.5mm; display: flex; align-items: baseline; gap: 2.5mm; }
+  h2 .n { font-size: 9pt; color: var(--accent); font-weight: 600; }
+  .intro { font-size: 9pt; line-height: 1.45; color: var(--ink-2); margin-top: 1.5mm; max-width: 170mm; }
+
+  .grid { display: grid; gap: 2.6mm; margin-top: 2.6mm; }
+  .g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tile { background: var(--panel); border: 0.3mm solid var(--rule); border-radius: 2.5mm; padding: 2.8mm 3.4mm; }
+  .tile .t { font-size: 9.6pt; font-weight: 600; line-height: 1.25; color: var(--ink); }
+  .tile .d { font-size: 8.3pt; line-height: 1.4; color: var(--ink-2); margin-top: 1.1mm; }
+  .tile .k { font-size: 8pt; font-weight: 600; color: var(--accent); margin-bottom: 1.6mm; }
+  .step .num { width: 6.5mm; height: 6.5mm; border-radius: 3.25mm; background: var(--accent); color: var(--accent-ink); font-size: 8.5pt; font-weight: 600; line-height: 6.5mm; text-align: center; margin-bottom: 1.8mm; }
+
+  .principle { font-size: 9.5pt; line-height: 1.4; margin-top: 2.6mm; }
+  .principle .a { color: var(--accent); font-weight: 600; }
+
+  .trust { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.8mm 7mm; margin-top: 2.6mm; list-style: none; padding: 0; }
+  .trust li { display: grid; grid-template-columns: 4mm minmax(0, 1fr); gap: 2mm; font-size: 8.5pt; line-height: 1.4; color: var(--ink-2); }
+  .trust li b { color: var(--ink); font-weight: 600; }
+  .trust svg { width: 3.6mm; height: 3.6mm; margin-top: 0.6mm; }
+
+  .spacer { flex: 1; min-height: 4mm; }
+  .close { display: flex; justify-content: space-between; align-items: baseline; border-top: 0.3mm solid var(--rule); padding-top: 4mm; }
+  .close p { font-size: 10.5pt; color: var(--ink); }
+  .close .squad { font-size: 9pt; }
 </style>
 </head>
 <body>
 <div class="page">
-  <h1>TestPilot AI</h1>
+  <div class="top"><h1>TestPilot AI</h1><span class="squad">Python Mirai Squad</span></div>
   <div class="rule"></div>
   <p class="lede">Test an API without writing the tests.</p>
-  <p class="sub">AI plans the tests. Code runs them and decides pass or fail.</p>
+  <p class="sub">An AI test planner for REST APIs. The AI plans the tests and explains failures; code runs every request and decides pass or fail.</p>
 
-  <h2>The problem</h2>
-  <p class="body">Writing API tests is part of our daily work, and it is slow. Every endpoint needs its own Postman scripts or pytest cases, written by hand.</p>
-  <p class="body">Schema checks get written because they are easy. Business rules such as “email must be unique” or “a user may only edit their own account” often go untested until a bug reaches staging.</p>
-  <p class="body">AI chat tools such as Claude and ChatGPT can help draft tests, but that means manual prompting and copy-paste: <b>no proper flow, no record of what was tested, and no reliable pass or fail.</b></p>
-
-  <h2>What TestPilot AI is</h2>
-  <p class="body">A web app that turns an OpenAPI spec and your business rules into a reviewed, runnable test plan, in four steps.</p>
-  <div class="steps">
-    <div class="step"><p class="num">1</p><h3>Your API</h3><p>Paste the spec link and the server to test.</p></div>
-    <div class="step"><p class="num">2</p><h3>What to test</h3><p>Choose the focus, depth and business rules.</p></div>
-    <div class="step"><p class="num">3</p><h3>Review plan</h3><p>See every case, who made it and why. Edit before anything runs.</p></div>
-    <div class="step"><p class="num">4</p><h3>Results</h3><p>A readable report of what to fix, with a suggested fix.</p></div>
+  <h2><span class="n">01</span>The problem</h2>
+  <div class="grid g3">
+    <div class="tile"><p class="t">Slow to write</p><p class="d">Writing API tests is daily work, and every endpoint needs its own Postman scripts or pytest cases, written by hand.</p></div>
+    <div class="tile"><p class="t">Business rules get missed</p><p class="d">Schema checks get written; rules like “email must be unique” or “users edit only their own account” often go untested until a bug reaches staging.</p></div>
+    <div class="tile"><p class="t">AI chat is manual</p><p class="d">Claude, ChatGPT and other LLMs can draft tests, but it is prompting and copy-paste: no flow, no record, no reliable pass or fail.</p></div>
   </div>
-  <p class="principle"><span class="accent">AI plans and explains.</span> Code runs every request and decides pass or fail.</p>
-  <p class="body">It signs in to protected APIs by itself, can test with a second user to check one user cannot reach another’s data, and works with several AI providers.</p>
+
+  <h2><span class="n">02</span>What TestPilot AI is</h2>
+  <p class="intro">A web app that turns an OpenAPI spec and your business rules into a reviewed, runnable test plan, in four guided steps.</p>
+  <div class="grid g4">
+    <div class="tile step"><p class="num">1</p><p class="t">Your API</p><p class="d">Paste the spec link and the server to test.</p></div>
+    <div class="tile step"><p class="num">2</p><p class="t">What to test</p><p class="d">Choose the endpoints, focus, depth and business rules.</p></div>
+    <div class="tile step"><p class="num">3</p><p class="t">Review plan</p><p class="d">See every case, who made it and why. Edit before anything runs.</p></div>
+    <div class="tile step"><p class="num">4</p><p class="t">Results</p><p class="d">A readable report of what to fix, with a suggested fix.</p></div>
+  </div>
+  <p class="principle"><span class="a">AI plans and explains.</span> Code runs every request and decides pass or fail.</p>
+
+  <h2><span class="n">03</span>Key capabilities</h2>
+  <div class="grid g3">
+    <div class="tile"><p class="t">Signs itself in</p><p class="d">Finds sign-up and login in the spec and gets its own token. Asks for a login or token only when it has to.</p></div>
+    <div class="tile"><p class="t">Tests with two users</p><p class="d">A second test user tries to read, change or delete the first user’s data. Any success is a finding.</p></div>
+    <div class="tile"><p class="t">Three sources of cases</p><p class="d">AI cases from your rules, schema cases from the spec and optional fuzzing, each labelled with who made it.</p></div>
+    <div class="tile"><p class="t">Review before it runs</p><p class="d">See every case before anything is sent. Edit, remove, or ask the AI for more in plain English.</p></div>
+    <div class="tile"><p class="t">A report built for fixing</p><p class="d">One row per root cause with the request, response, checks and likely cause. Show fix adds steps and code.</p></div>
+    <div class="tile"><p class="t">Works with several AI providers</p><p class="d">Pick the provider in Settings; it powers planning, explanations and fixes.</p></div>
+  </div>
+
+  <h2><span class="n">04</span>Why you can trust the results</h2>
+  <ul class="trust">
+    <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#C6F15C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Code decides pass or fail</b> from status codes, the documented schema and response time. The AI never does.</span></li>
+    <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#C6F15C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Every AI case is checked</b> against the spec before it can run; invalid drafts are rejected with a reason.</span></li>
+    <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#C6F15C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Secrets stay hidden.</b> Tokens and passwords are masked in every request, response and report.</span></li>
+    <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#C6F15C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Safe by default.</b> Requests go only to allowed test servers, within a request budget per run.</span></li>
+    <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#C6F15C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Nothing is deleted by surprise.</b> Delete requests run only when you allow them.</span></li>
+    <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#C6F15C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Every case explains itself.</b> Each one records who made it and why, so a failure can be traced.</span></li>
+  </ul>
 
   <div class="spacer"></div>
-  <p class="close">In the session we will show it live on a sample API.</p>
-  <p class="foot">Python Mirai Squad</p>
+  <div class="close"><p>In the session we will show it live on a sample API.</p><span class="squad">Python Mirai Squad</span></div>
 </div>
 </body>
 </html>
