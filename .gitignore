@@ -12,3 +12,6 @@ node_modules/
 .hypothesis/
 *.tsbuildinfo
 .superpowers/
+
+# archify working folders (diagram sources and receipts); exported SVGs live in docs/diagrams
+.archify/

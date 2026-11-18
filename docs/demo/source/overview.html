@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TestPilot AI: overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;600&display=swap">
+<style>
+  :root {
+    --paper: #0B1116;
+    --panel: #121A20;
+    --rule: #253038;
+    --ink: #EEF2F4;
+    --ink-2: #C4CCD1;
+    --muted: #94A0A8;
+    --accent: #C6F15C;
+    --accent-ink: #18240A;
+    --font: 'Geologica', Arial, sans-serif;
+  }
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--paper); }
+  body { font-family: var(--font); color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; height: 297mm; padding: 20mm 18mm 16mm; display: flex; flex-direction: column; overflow: hidden; }
+  .brand { font-size: 10pt; color: var(--muted); }
+  h1 { font-size: 34pt; font-weight: 600; line-height: 1.05; }
+  .rule { width: 18mm; height: 1.6mm; background: var(--accent); margin: 6mm 0; }
+  .lede { font-size: 16pt; font-weight: 400; line-height: 1.3; color: var(--ink); }
+  .sub { font-size: 11pt; line-height: 1.5; color: var(--ink-2); margin-top: 2.5mm; }
+  h2 { font-size: 15pt; font-weight: 600; margin-top: 9mm; }
+  p.body { font-size: 10.5pt; line-height: 1.6; color: var(--ink-2); margin-top: 3mm; max-width: 165mm; }
+  p.body b { color: var(--ink); font-weight: 600; }
+  .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4mm; margin-top: 5mm; }
+  .step { background: var(--panel); border: 0.3mm solid var(--rule); border-radius: 3mm; padding: 4.5mm 4mm; }
+  .step .num { margin: 0; width: 8mm; height: 8mm; border-radius: 4mm; background: var(--accent); color: var(--accent-ink); font-size: 10pt; font-weight: 600; line-height: 8mm; text-align: center; }
+  .step h3 { font-size: 11.5pt; font-weight: 600; margin-top: 3.5mm; }
+  .step p { font-size: 9.5pt; line-height: 1.45; color: var(--ink-2); margin-top: 1.8mm; }
+  .principle { font-size: 11pt; line-height: 1.5; margin-top: 6mm; }
+  .principle .accent { color: var(--accent); }
+  .spacer { flex: 1; min-height: 6mm; }
+  .close { font-size: 11pt; line-height: 1.5; color: var(--ink); border-top: 0.3mm solid var(--rule); padding-top: 5mm; }
+  .foot { font-size: 9pt; color: var(--muted); margin-top: 3mm; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>TestPilot AI</h1>
+  <div class="rule"></div>
+  <p class="lede">Test an API without writing the tests.</p>
+  <p class="sub">AI plans the tests. Code runs them and decides pass or fail.</p>
+
+  <h2>The problem</h2>
+  <p class="body">Writing API tests is part of our daily work, and it is slow. Every endpoint needs its own Postman scripts or pytest cases, written by hand.</p>
+  <p class="body">Schema checks get written because they are easy. Business rules such as “email must be unique” or “a user may only edit their own account” often go untested until a bug reaches staging.</p>
+  <p class="body">AI chat tools such as Claude and ChatGPT can help draft tests, but that means manual prompting and copy-paste: <b>no proper flow, no record of what was tested, and no reliable pass or fail.</b></p>
+
+  <h2>What TestPilot AI is</h2>
+  <p class="body">A web app that turns an OpenAPI spec and your business rules into a reviewed, runnable test plan, in four steps.</p>
+  <div class="steps">
+    <div class="step"><p class="num">1</p><h3>Your API</h3><p>Paste the spec link and the server to test.</p></div>
+    <div class="step"><p class="num">2</p><h3>What to test</h3><p>Choose the focus, depth and business rules.</p></div>
+    <div class="step"><p class="num">3</p><h3>Review plan</h3><p>See every case, who made it and why. Edit before anything runs.</p></div>
+    <div class="step"><p class="num">4</p><h3>Results</h3><p>A readable report of what to fix, with a suggested fix.</p></div>
+  </div>
+  <p class="principle"><span class="accent">AI plans and explains.</span> Code runs every request and decides pass or fail.</p>
+  <p class="body">It signs in to protected APIs by itself, can test with a second user to check one user cannot reach another’s data, and works with several AI providers.</p>
+
+  <div class="spacer"></div>
+  <p class="close">In the session we will show it live on a sample API.</p>
+  <p class="foot">Python Mirai Squad</p>
+</div>
+</body>
+</html>
