@@ -8,6 +8,18 @@ from backend.schemas import Endpoint, RequestSpec, TestCase
 SETUP_REF = re.compile(r"\{\{\s*setup\.(\d+)\.")
 PATH_PARAM = re.compile(r"\{([^}]+)\}")
 TEMPLATE_NAME = re.compile(r"\{\{\s*([\w.\-]+)\s*\}\}")
+BARE_TEMPLATE = re.compile(r'(?<!["\w])(\{\{\s*[\w.\-]+\s*\}\})(?!["\w])')
+
+
+def _loads(text: str) -> Any:
+    """JSON, also when a model left a {{template}} value unquoted: {"id": {{setup.0.body.id}}}."""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        fixed = BARE_TEMPLATE.sub(r'"\1"', text)
+        if fixed == text:
+            raise
+        return json.loads(fixed)
 
 
 class PlanRejected(ValueError):
@@ -35,7 +47,7 @@ def _json_object(text: str, label: str) -> dict[str, Any]:
     if not text:
         return {}
     try:
-        value = json.loads(text)
+        value = _loads(text)
     except json.JSONDecodeError as exc:
         raise PlanRejected(f"{label} is not valid JSON") from exc
     if not isinstance(value, dict):
@@ -63,22 +75,54 @@ def _check_templates(serialized: str, variables: frozenset[str]) -> None:
             raise PlanRejected(f"uses unknown variable {{{{{name}}}}}")
 
 
+def resolve_endpoint(method: str, path: str, endpoints: dict[str, Endpoint]) -> tuple[Endpoint, dict[str, str]]:
+    """The spec endpoint a request means, and any path values written into the path itself.
+
+    Models sometimes write "/orders/{{order_id}}" or "/orders/42" where the spec says "/orders/{order_id}";
+    those resolve to the spec path, with "{{order_id}}" or "42" moved into the path parameters."""
+    method = method.upper().strip()
+    path = path.strip()
+    first, _, rest = path.partition(" ")
+    if first.upper() == method and rest.strip().startswith("/"):  # "GET /orders" written into the path field
+        path = rest.strip()
+    exact = endpoints.get(f"{method} {path}")
+    if exact is not None:
+        return exact, {}
+    given = [seg for seg in path.split("?")[0].strip("/").split("/")]
+    matches: list[tuple[Endpoint, dict[str, str]]] = []
+    for ep in endpoints.values():
+        template = ep.path.strip("/").split("/")
+        if ep.method != method or len(template) != len(given):
+            continue
+        values: dict[str, str] = {}
+        for want, got in zip(template, given):
+            name = PATH_PARAM.fullmatch(want)
+            if name and not want.startswith("{{"):
+                if got != want and got:
+                    values[name.group(1)] = got
+            elif want != got:
+                break
+        else:
+            matches.append((ep, values))
+    if len(matches) != 1:
+        raise PlanRejected(f"{method} {path} is not in the specification")
+    return matches[0]
+
+
 def _to_request(
     raw: ai.AiRequest, endpoints: dict[str, Endpoint], max_setup_ref: int, variables: frozenset[str] = frozenset()
 ) -> RequestSpec:
-    endpoint_id = f"{raw.method.upper()} {raw.path}"
-    if endpoint_id not in endpoints:
-        raise PlanRejected(f"{endpoint_id} is not in the specification")
+    ep, written_in_path = resolve_endpoint(raw.method, raw.path, endpoints)
 
-    path_params = _json_object(raw.path_params_json, "path_params_json")
-    missing = set(PATH_PARAM.findall(raw.path)) - set(path_params)
+    path_params = {**written_in_path, **_json_object(raw.path_params_json, "path_params_json")}
+    missing = set(PATH_PARAM.findall(ep.path)) - set(path_params)
     if missing:
         raise PlanRejected(f"missing path parameters: {', '.join(sorted(missing))}")
 
     body: Any = None
     if raw.body_json.strip():
         try:
-            body = json.loads(raw.body_json)
+            body = _loads(raw.body_json)
         except json.JSONDecodeError as exc:
             raise PlanRejected("body_json is not valid JSON; malformed bodies belong in raw_body") from exc
 
@@ -91,8 +135,8 @@ def _to_request(
     _check_templates(serialized, variables)
 
     return RequestSpec(
-        method=raw.method.upper(),
-        path=raw.path,
+        method=ep.method,
+        path=ep.path,
         path_params=path_params,
         query=query,
         headers=headers,
@@ -102,19 +146,19 @@ def _to_request(
 
 
 def to_test_case(raw: ai.AiCase, endpoints: dict[str, Endpoint], variables: frozenset[str] = frozenset()) -> TestCase:
-    if raw.endpoint_id not in endpoints:
-        raise PlanRejected(f"{raw.endpoint_id} is not in the specification")
+    method, _, path = raw.endpoint_id.strip().partition(" ")
+    endpoint_id = resolve_endpoint(method, path, endpoints)[0].id
     setup = [_to_request(step, endpoints, max_setup_ref=i, variables=variables) for i, step in enumerate(raw.setup)]
     if any(step.method == "DELETE" for step in setup):
         raise PlanRejected("setup steps may not delete data")
     request = _to_request(raw.request, endpoints, max_setup_ref=len(setup), variables=variables)
-    if f"{request.method} {request.path}" != raw.endpoint_id:
+    if f"{request.method} {request.path}" != endpoint_id:
         raise PlanRejected("request does not match its endpoint_id")
 
     expected = validate_expected(raw.expected_status)
 
     return TestCase(
-        endpoint_id=raw.endpoint_id,
+        endpoint_id=endpoint_id,
         name=raw.name.strip()[:120],
         category=raw.category,
         source="ai",

@@ -12,7 +12,7 @@ from backend import workspace_repo as repo
 from backend.api.core import RunListItem
 from backend.api.navigation import _run_item
 from backend.api.planning import create_plan
-from backend.auth_detect import PASSWORD_VAR, USERNAME_VAR, AuthDetection, detect
+from backend.auth_detect import PASSWORD_VAR, SECOND_SUFFIX, USERNAME_VAR, AuthDetection, detect
 from backend.db import ItemRow, ProjectRow, session
 from backend.engines.examples import example_for
 from backend.schemas import ApiSummary, Run, TestPlan
@@ -57,6 +57,7 @@ class AccessStatus(BaseModel):
     auth: AuthDetection
     has_token: bool
     has_login: bool
+    has_second_login: bool = False
     needs_input: bool
 
 
@@ -66,6 +67,8 @@ class AccessIn(BaseModel):
     token: str | None = Field(default=None, max_length=4000)
     username: str | None = Field(default=None, max_length=320)
     password: str | None = Field(default=None, max_length=1000)
+    username_b: str | None = Field(default=None, max_length=320)  # an optional second test login for two-user tests
+    password_b: str | None = Field(default=None, max_length=1000)
 
 
 class StartOut(BaseModel):
@@ -163,8 +166,9 @@ def access_status(api: ApiSummary, environment_id: str) -> AccessStatus:
     filled = {v.key for v in _environment(environment_id).variables if v.has_value}
     has_token = TOKEN_VARIABLE in filled
     has_login = {USERNAME_VAR, PASSWORD_VAR} <= filled
+    has_second_login = {USERNAME_VAR + SECOND_SUFFIX, PASSWORD_VAR + SECOND_SUFFIX} <= filled
     needs = (auth.mode == "token" and not has_token) or (auth.mode == "credentials" and not has_login)
-    return AccessStatus(auth=auth, has_token=has_token, has_login=has_login, needs_input=needs)
+    return AccessStatus(auth=auth, has_token=has_token, has_login=has_login, has_second_login=has_second_login, needs_input=needs)
 
 
 def _load_api(spec_id: str) -> ApiSummary:
@@ -197,6 +201,13 @@ def save_access(body: AccessIn):
             raise HTTPException(status_code=422, detail="Enter both the test login and its password")
         values[USERNAME_VAR] = (username, False)
         values[PASSWORD_VAR] = (password, True)
+    username_b = (body.username_b or "").strip()
+    password_b = body.password_b or ""
+    if username_b or password_b:
+        if not (username_b and password_b):
+            raise HTTPException(status_code=422, detail="Enter both the second test login and its password")
+        values[USERNAME_VAR + SECOND_SUFFIX] = (username_b, False)
+        values[PASSWORD_VAR + SECOND_SUFFIX] = (password_b, True)
     if not values:
         raise HTTPException(status_code=422, detail="Nothing to save")
     _guard(lambda: _set_variables(body.environment_id, values))

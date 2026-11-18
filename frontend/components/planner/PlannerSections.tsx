@@ -159,6 +159,7 @@ export function PlannerSections({
   environment = null,
   aiEnabled,
   authNote,
+  secondUser,
 }: {
   config: PlannerConfig;
   onChange: Patch;
@@ -170,6 +171,8 @@ export function PlannerSections({
   aiEnabled: boolean | null;
   /** How runs of this API sign in, when TestPilot knows. */
   authNote?: React.ReactNode;
+  /** Offered when runs can sign in a second user (B): what it does, and anything still needed to make it work. */
+  secondUser?: { hint: string; extra?: React.ReactNode };
 }) {
   const [rolesText, setRolesText] = useState(config.auth.roles.join(", "));
   useEffect(() => {
@@ -184,7 +187,9 @@ export function PlannerSections({
     const next = new Set(objectives);
     if (next.has(id)) next.delete(id);
     else next.add(id);
-    onChange({ objectives: OBJECTIVES.map((o) => o.id).filter((o) => next.has(o)) });
+    const patch: Partial<PlannerConfig> = { objectives: OBJECTIVES.map((o) => o.id).filter((o) => next.has(o)) };
+    if (id === "auth" && secondUser) patch.auth = { ...config.auth, second_user: next.has("auth") };
+    onChange(patch);
   };
   const depth = DEPTH.find((d) => d.id === config.depth) ?? DEPTH[1];
   const scopeCount = config.focus_endpoints.length || endpoints.length;
@@ -371,6 +376,23 @@ export function PlannerSections({
             <Icon name="key" />
             <span>{authNote}</span>
           </p>
+        )}
+        {secondUser && (
+          <div className={styles.secondUser}>
+            <label className="check">
+              <input
+                type="checkbox"
+                name="second_user"
+                checked={Boolean(config.auth.second_user)}
+                onChange={(e) => onChange({ auth: { ...config.auth, second_user: e.target.checked } })}
+              />
+              <span>
+                Test with a second user
+                <span className={styles.engineHint}>{secondUser.hint}</span>
+              </span>
+            </label>
+            {config.auth.second_user && secondUser.extra}
+          </div>
         )}
         <div className={styles.twoCol}>
           <div className="field">

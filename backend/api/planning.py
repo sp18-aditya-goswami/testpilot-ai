@@ -263,6 +263,8 @@ async def start_run(plan_id: str, body: RunRequest):
                 secrets=secrets,
                 login=auth.login,
                 token_variable=auth.token_variable or "token",
+                second_user=auth.second_user,
+                second_token_variable=auth.second_token_variable,
             )
         finally:
             active_runs.pop(run.id, None)

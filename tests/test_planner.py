@@ -175,3 +175,30 @@ def test_refine_requires_ai(client, spec_id):
     plan = create(client, spec_id)
     res = client.post(f"/api/plans/{plan['id']}/refine", json={"instruction": "more"})
     assert res.status_code == 422
+
+
+def test_loosely_written_paths_resolve_to_the_spec_endpoint(demo_api):
+    from backend.engines.ai_planner import PlanRejected, resolve_endpoint
+
+    by_id = {e.id: e for e in demo_api.endpoints}
+    ep, values = resolve_endpoint("put", "/api/users/{{setup.0.body.id}}", by_id)
+    assert ep.id == "PUT /api/users/{user_id}" and values == {"user_id": "{{setup.0.body.id}}"}
+    ep, values = resolve_endpoint("GET", "/api/users/42", by_id)
+    assert ep.id == "GET /api/users/{user_id}" and values == {"user_id": "42"}
+    ep, values = resolve_endpoint("GET", "/api/users/{user_id}", by_id)
+    assert values == {}
+    ep, values = resolve_endpoint("GET", "GET /api/users/{user_id}", by_id)
+    assert ep.id == "GET /api/users/{user_id}" and values == {}
+    try:
+        resolve_endpoint("GET", "/api/nothing/here", by_id)
+    except PlanRejected:
+        pass
+    else:
+        raise AssertionError("an unknown path must be rejected")
+
+
+def test_unquoted_template_values_are_accepted():
+    from backend.engines.ai_planner import _json_object
+
+    assert _json_object('{"order_id": {{setup.0.body.id}}}', "path_params_json") == {"order_id": "{{setup.0.body.id}}"}
+    assert _json_object('{"Authorization": "Bearer {{token_b}}"}', "headers_json") == {"Authorization": "Bearer {{token_b}}"}

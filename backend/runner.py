@@ -8,7 +8,7 @@ from backend import ai
 from backend.config import get_settings
 from backend.executor import BudgetExceeded, CaseContext, Executor, make_client
 from backend.findings import failure_digest, regression_test, rules_analysis
-from backend.auth_detect import find_token
+from backend.auth_detect import find_token, second_user_flow
 from backend.schemas import (
     Analysis,
     ApiSummary,
@@ -73,8 +73,10 @@ def _auth_request(step: AuthStep, ctx: CaseContext) -> RequestSpec:
     )
 
 
-async def sign_in(run: Run, executor: Executor, flow: LoginFlow, variables: dict[str, str]) -> str | None:
-    """Gets the run its own token: registers a fresh test user when the flow says so, then signs in."""
+async def sign_in(run: Run, executor: Executor, flow: LoginFlow, variables: dict[str, str], who: str = "") -> str | None:
+    """Gets the run its own token: registers a fresh test user when the flow says so, then signs in.
+
+    `who` names the user in notes ("user B") when a run signs in more than one."""
     ctx = CaseContext(variables)
     steps = [("Sign-up", flow.signup), ("Sign-in", flow.login)]
     exchange = None
@@ -85,17 +87,24 @@ async def sign_in(run: Run, executor: Executor, flow: LoginFlow, variables: dict
         run.auth_exchanges.append(exchange)
         if exchange.status is None or exchange.status >= 400:
             hint = " Check the test login in the plan's first step." if label == "Sign-in" and flow.signup is None else ""
-            run.auth_note = f"{label} failed: {step.endpoint_id} returned {exchange.status or exchange.error}, so no tests ran.{hint}"
+            for_who = f" for {who}" if who else ""
+            run.auth_note = f"{label}{for_who} failed: {step.endpoint_id} returned {exchange.status or exchange.error}.{hint}"
             return None
     token = find_token(exchange.response_body if exchange else None, flow.token_field)
     if not token:
-        run.auth_note = f"Signed in with {flow.login.endpoint_id}, but its response holds no token TestPilot recognises, so no tests ran."
+        run.auth_note = f"Signed in with {flow.login.endpoint_id}, but its response holds no token TestPilot recognises."
         return None
     executor.secrets.add(token)
     run.auth_exchanges = [executor._redact(e) for e in run.auth_exchanges]  # the token arrived in the last one
-    who = f"a new test user from {flow.signup.endpoint_id}" if flow.signup else "your test account"
-    run.auth_note = f"Signed in with {flow.login.endpoint_id} as {who} before the tests."
+    whom = f"a new test user from {flow.signup.endpoint_id}" if flow.signup else "your test account"
+    run.auth_note = f"Signed in with {flow.login.endpoint_id} as {whom} before the tests."
     return token
+
+
+def _two_user_note(flow: LoginFlow) -> str:
+    if flow.signup is not None:
+        return f"Signed in two new test users, A and B, from {flow.signup.endpoint_id} and {flow.login.endpoint_id} before the tests."
+    return f"Signed in your two test logins, A and B, with {flow.login.endpoint_id} before the tests."
 
 
 def _recount(run: Run) -> None:
@@ -210,6 +219,8 @@ async def execute_run(
     secrets: set[str] | None = None,
     login: LoginFlow | None = None,
     token_variable: str = "token",
+    second_user: bool = False,
+    second_token_variable: str = "token_b",
 ) -> None:
     """Runs every case in `run`. Without `api` (saved-request runs) there is no contract to check against."""
     settings = get_settings()
@@ -222,13 +233,22 @@ async def execute_run(
         async with make_client(timeout=settings.request_timeout_s, limits=limits, follow_redirects=False) as client:
             executor = Executor(client, run.base_url, settings.max_requests_per_run, secrets=secrets)
             if login is not None:
-                token = await sign_in(run, executor, login, variables or {})
+                token = await sign_in(run, executor, login, variables or {}, "user A" if second_user else "")
                 if token is None:
                     run.status = "failed"
+                    run.auth_note += " No tests ran."
                     run.message = run.auth_note
                     run.request_count = executor.sent
                     return
                 variables = {**(variables or {}), token_variable: token}
+                if second_user:
+                    first_note = run.auth_note
+                    token_b = await sign_in(run, executor, second_user_flow(login), variables, "user B")
+                    if token_b is None:
+                        run.auth_note = f"{first_note} {run.auth_note} Cases that act as user B could not run."
+                    else:
+                        variables[second_token_variable] = token_b
+                        run.auth_note = _two_user_note(login)
             semaphore = asyncio.Semaphore(settings.max_concurrency)
 
             async def one(case: TestCase) -> None:

@@ -35,10 +35,15 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
     return TokenOut(access_token=token)
 
 
-@router.get("/me", response_model=UserOut, summary="The signed-in user")
-def me(credentials: HTTPAuthorizationCredentials | None = Depends(bearer), db: Session = Depends(get_db)):
+def signed_in_user(credentials: HTTPAuthorizationCredentials | None = Depends(bearer), db: Session = Depends(get_db)) -> User:
+    """The user behind the bearer token; 401 without a valid one."""
     user_id = _sessions.get(credentials.credentials) if credentials else None
     user = db.get(User, user_id) if user_id else None
     if user is None:
         raise HTTPException(status_code=401, detail="Sign in first")
+    return user
+
+
+@router.get("/me", response_model=UserOut, summary="The signed-in user")
+def me(user: User = Depends(signed_in_user)):
     return user

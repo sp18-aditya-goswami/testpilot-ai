@@ -29,6 +29,7 @@ NOT_SIGN_IN = {"refresh", "logout", "signout", "sign-out", "revoke", "reset", "f
 
 USERNAME_VAR = "auth_username"
 PASSWORD_VAR = "auth_password"
+SECOND_SUFFIX = "_b"  # the second test login: auth_username_b and auth_password_b
 TEST_EMAIL = f"testpilot.{UNIQUE}@example.com"
 TEST_USERNAME = f"testpilot_{UNIQUE}"
 TEST_PASSWORD = f"Tp-{UNIQUE}-Pass1!"
@@ -252,6 +253,21 @@ def detect(api: ApiSummary) -> AuthDetection:
             f"each run signs in with {login.id} and uses the token it gets back."
         ),
     )
+
+
+def second_user_flow(flow: LoginFlow) -> LoginFlow:
+    """The same sign-in for user B. A sign-up flow makes its own fresh user; a saved login switches to the _b variables."""
+    if flow.signup is not None:
+        return flow
+
+    def swap(value: Any) -> Any:
+        if isinstance(value, str):
+            for var in (USERNAME_VAR, PASSWORD_VAR):
+                value = value.replace(f"{{{{{var}}}}}", f"{{{{{var}{SECOND_SUFFIX}}}}}")
+        return value
+
+    login = flow.login.model_copy(update={"body": {k: swap(v) for k, v in flow.login.body.items()}})
+    return flow.model_copy(update={"login": login})
 
 
 def find_token(body: Any, token_field: str = "") -> str | None:

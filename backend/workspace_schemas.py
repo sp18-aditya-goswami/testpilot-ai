@@ -331,6 +331,8 @@ class AuthContext(BaseModel):
     scheme: str = "Bearer"  # what goes before the token in the header; empty sends the token alone (API keys)
     token_variable: str | None = None  # environment variable holding a valid token, e.g. "token"
     login: LoginFlow | None = None  # when set, each run signs in first and fills token_variable itself
+    second_user: bool = False  # sign in a second user too, so cases can check one user cannot touch another's data
+    second_token_variable: str = "token_b"  # holds the second user's token
     roles: list[str] = []  # roles the API distinguishes, each optionally backed by an env variable "<role>_token"
 
 

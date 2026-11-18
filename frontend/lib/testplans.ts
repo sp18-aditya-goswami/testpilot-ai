@@ -18,6 +18,7 @@ export interface AccessStatus {
   auth: AuthDetection;
   has_token: boolean;
   has_login: boolean;
+  has_second_login?: boolean;
   needs_input: boolean;
 }
 
@@ -27,6 +28,8 @@ export interface AccessIn {
   token?: string;
   username?: string;
   password?: string;
+  username_b?: string;
+  password_b?: string;
 }
 
 /** Step 1 of the guided flow: the API under test, found or created as a project and environment. */

@@ -50,11 +50,13 @@ def plan_variable_keys(env_keys, config: PlannerConfig) -> list[str]:
     keys = set(env_keys)
     if config.auth.login is not None and config.auth.token_variable:
         keys.add(config.auth.token_variable)
+        if config.auth.second_user:
+            keys.add(config.auth.second_token_variable)
     return sorted(keys)
 
 
-def auth_header_value(config: PlannerConfig) -> str:
-    token = f"{{{{{config.auth.token_variable}}}}}"
+def auth_header_value(config: PlannerConfig, variable: str | None = None) -> str:
+    token = f"{{{{{variable or config.auth.token_variable}}}}}"
     scheme = (config.auth.scheme or "").strip()
     return f"{scheme} {token}" if scheme else token
 
@@ -98,6 +100,13 @@ def build_context(endpoints: list[Endpoint], config: PlannerConfig, variable_key
         auth_lines.append(f'Valid requests send the header "{auth.header_name}: {auth_header_value(config)}".')
     if auth.login is not None:
         auth_lines.append("TestPilot signs in before the run, so do not write sign-up or sign-in setup steps just to get a token.")
+    if auth.token_variable and auth.second_user and auth.second_token_variable in variable_keys:
+        auth_lines.append(
+            f'A second signed-in user, user B, is available: send "{auth.header_name}: {auth_header_value(config, auth.second_token_variable)}" to act as user B. '
+            "The default token is user A. For permission cases, find or create something that belongs to user A using user A's token "
+            "(for example in a setup step), then try to read, change or delete it as user B; the API should refuse with 403 or 404. "
+            "Set the header explicitly on every request that acts as user B."
+        )
     if auth.roles:
         role_vars = [f"{r}: {{{{{r}_token}}}}" if f"{r}_token" in variable_keys else f"{r}: no token variable" for r in auth.roles]
         auth_lines.append("Roles and their token variables: " + "; ".join(role_vars) + ".")
@@ -270,13 +279,13 @@ async def generate_for_endpoints(
             if len(accepted) >= min(cap, MAX_CASES_PER_ENDPOINT):
                 plan.rejected.append(RejectedCase(name=raw.name, reason="over the case limit for this endpoint"))
                 continue
-            if raw.endpoint_id != ep.id:
-                plan.rejected.append(RejectedCase(name=raw.name, reason=f"written for {raw.endpoint_id}, not {ep.id}"))
-                continue
             try:
                 case = to_test_case(raw, by_id, variables)
             except PlanRejected as exc:
                 plan.rejected.append(RejectedCase(name=raw.name, reason=str(exc)))
+                continue
+            if case.endpoint_id != ep.id:
+                plan.rejected.append(RejectedCase(name=raw.name, reason=f"written for {case.endpoint_id}, not {ep.id}"))
                 continue
             apply_auth(case, config, variable_keys, main_too=case.category != "security")
             accepted.append(case)

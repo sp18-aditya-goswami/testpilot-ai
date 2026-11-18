@@ -51,6 +51,7 @@
 
 .authNote { display: flex; gap: var(--space-xs); align-items: flex-start; margin: 0; padding: var(--space-sm) var(--space-md); border-radius: var(--radius-card); background: var(--color-paper-3); font-size: var(--text-sm); color: var(--color-ink-2); overflow-wrap: anywhere; }
 .authNote :global(svg) { flex: none; margin-top: 0.3em; }
+.secondUser { display: grid; gap: var(--space-sm); }
 
 .scope > summary:focus-visible, .settingsLink:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 

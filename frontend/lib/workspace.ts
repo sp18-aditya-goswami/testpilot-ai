@@ -137,6 +137,9 @@ export interface AuthContext {
   scheme?: string;
   token_variable: string | null;
   login?: LoginFlow | null;
+  /** Sign in a second user (B) too, so cases can check one user cannot touch another's data. */
+  second_user?: boolean;
+  second_token_variable?: string;
   roles: string[];
 }
 

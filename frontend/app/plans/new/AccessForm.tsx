@@ -13,9 +13,69 @@ export const TOKEN_VARIABLE = "token";
 export function authFor(current: AuthContext, access: AccessStatus | null): AuthContext {
   if (!access) return current;
   const a = access.auth;
-  if (a.mode === "auto" || a.mode === "credentials") return { ...current, token_variable: TOKEN_VARIABLE, header_name: a.header_name, scheme: a.scheme, login: a.flow };
-  if (a.mode === "token") return { ...current, token_variable: TOKEN_VARIABLE, header_name: a.header_name, scheme: a.scheme, login: null };
-  return { ...current, token_variable: access.has_token ? (current.token_variable ?? TOKEN_VARIABLE) : current.token_variable, login: null };
+  if (a.mode === "auto" || a.mode === "credentials")
+    return { ...current, token_variable: TOKEN_VARIABLE, header_name: a.header_name, scheme: a.scheme, login: a.flow, second_user: Boolean(current.second_user) };
+  if (a.mode === "token") return { ...current, token_variable: TOKEN_VARIABLE, header_name: a.header_name, scheme: a.scheme, login: null, second_user: false };
+  return { ...current, token_variable: access.has_token ? (current.token_variable ?? TOKEN_VARIABLE) : current.token_variable, login: null, second_user: false };
+}
+
+/** A second test login (user B) for two-user tests on an API without sign-up. */
+export function SecondLoginForm({
+  access,
+  specId,
+  environmentId,
+  onSaved,
+}: {
+  access: AccessStatus;
+  specId: string;
+  environmentId: string;
+  onSaved: (next: AccessStatus) => void;
+}) {
+  const ids = { user: useId(), password: useId() };
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const label = access.auth.username_label.toLowerCase();
+
+  async function save() {
+    setError(null);
+    if (!(username.trim() && password)) return setError(`Enter user B's ${label} and password.`);
+    setBusy(true);
+    try {
+      const next = await testPlans.saveAccess({ spec_id: specId, environment_id: environmentId, username_b: username.trim(), password_b: password });
+      setPassword("");
+      onSaved(next);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className={styles.second}>
+      <div className={styles.twoCol}>
+        <div className="field">
+          <label htmlFor={ids.user}>User B {label}</label>
+          <input id={ids.user} name="auth_username_b" className="input" autoComplete="off" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} />
+        </div>
+        <div className="field">
+          <label htmlFor={ids.password}>User B password</label>
+          <input id={ids.password} name="auth_password_b" className="input" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+      </div>
+      <div className={styles.actions}>
+        <button type="button" className="key" onClick={save} disabled={busy} aria-busy={busy}>
+          {busy && <span className="spinner" aria-hidden="true" />}
+          {busy ? "Saving" : "Save user B"}
+        </button>
+        <span className={`small ${error ? "helper is-error" : "muted"}`} role={error ? "alert" : undefined}>
+          {error ?? "A different test account from user A. Stored as a secret."}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 /** Asks for the one thing the spec's auth needs: a test login when there is no sign-up endpoint, a token when there is no sign-in. */

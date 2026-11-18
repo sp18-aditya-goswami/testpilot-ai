@@ -29,6 +29,7 @@
 .barNote { flex: 1 1 16rem; margin: 0; padding-bottom: var(--space-sm); min-width: 0; }
 
 .access { margin-bottom: var(--space-md); }
+.second { display: grid; gap: var(--space-sm); padding: var(--space-md); border-radius: var(--radius-card); background: var(--color-paper-3); }
 .accessHead { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-sm); align-items: start; }
 .accessHead > :global(svg) { margin-top: 0.3em; color: var(--color-ink-2); }
 .accessHead p { max-width: 62ch; overflow-wrap: anywhere; }

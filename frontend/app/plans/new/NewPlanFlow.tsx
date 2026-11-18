@@ -10,7 +10,7 @@ import { Steps } from "@/components/Steps";
 import { api, errorMessage, type ApiSummary } from "@/lib/api";
 import { flowHref, testPlans, type AccessStatus } from "@/lib/testplans";
 import { DEFAULT_PLANNER_CONFIG, ws, type Item, type PlannerConfig } from "@/lib/workspace";
-import { AccessForm, authFor } from "./AccessForm";
+import { AccessForm, SecondLoginForm, authFor } from "./AccessForm";
 import styles from "./new-plan.module.css";
 
 /** What step 1 settled: the API under test and where it runs. */
@@ -178,6 +178,9 @@ export function NewPlanFlow() {
     if (!useAi && !config.use_contract) return setError("Turn on at least one source of test cases under More options.");
     if (useAi && config.objectives.length === 0) return setError("Pick at least one thing for the AI to focus on.");
     if (selected.size === 0) return setError("Choose at least one endpoint to test in section 1.");
+    const mode = target.access?.auth.mode;
+    if (config.auth.second_user && mode === "credentials" && !target.access?.has_second_login)
+      return setError("Save user B's test login in section 7, or turn off “Test with a second user”.");
     const finalConfig: PlannerConfig = {
       ...config,
       use_ai: useAi,
@@ -377,6 +380,19 @@ export function NewPlanFlow() {
             ? `Your token is sent in the ${a.header_name} header.`
             : "This API needs a token and none is saved yet, so protected endpoints will fail."
           : undefined;
+  const secondUser =
+    a?.mode === "auto"
+      ? { hint: "Each run also signs up user B, then checks that user B cannot read, change or delete user A's data." }
+      : a?.mode === "credentials" && target.access
+        ? {
+            hint: target.access.has_second_login
+              ? "Each run also signs in your second test login (user B) and checks that user B cannot read, change or delete user A's data."
+              : "Needs a second test account (user B). Add it below.",
+            extra: !target.access.has_second_login ? (
+              <SecondLoginForm access={target.access} specId={target.api.spec_id} environmentId={target.environmentId} onSaved={accessSaved} />
+            ) : undefined,
+          }
+        : undefined;
   const scopeCount = selected.size;
   const perEndpoint = { quick: 3, standard: 6, thorough: 12 }[config.depth];
   const useAi = config.use_ai && !aiOff;
@@ -421,7 +437,7 @@ export function NewPlanFlow() {
       )}
 
       <form className={styles.form} onSubmit={buildPlan} noValidate>
-        <PlannerSections config={config} onChange={patch} endpoints={endpoints} showEndpoints aiEnabled={aiEnabled} authNote={authNote} />
+        <PlannerSections config={config} onChange={patch} endpoints={endpoints} showEndpoints aiEnabled={aiEnabled} authNote={authNote} secondUser={secondUser} />
 
         <div className={styles.bar}>
           <div className={styles.barInner}>
