@@ -15,3 +15,6 @@ node_modules/
 
 # archify working folders (diagram sources and receipts); exported SVGs live in docs/diagrams
 .archify/
+
+# data exports made by scripts/export_data.py: share them directly, never commit
+exports/
